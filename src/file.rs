@@ -6,7 +6,8 @@ use std::io::Result;
 #[derive(Debug)]
 pub enum Status {
     Success,
-    FileInCache
+    FileInCache,
+    WriteSuccess
 }
 
 pub struct FileSystem {
@@ -54,14 +55,21 @@ impl FileSystem {
         Ok(Status::Success)
     }
 
-    pub fn write_to_cache(&mut self, file_name: String) {
-        
+    pub fn write_to_cache(&mut self, file_name: &str, new_content: String) -> Result<Status> {
+
+        if !self.cache.contains_key(file_name) {
+            return Err(std::io::Error::new(std::io::ErrorKind::InvalidInput, "File by name {file_name:?} is not in cache"))
+        }
+
+        self.add_to_cache(file_name.to_string(), new_content);
+
+        Ok(Status::WriteSuccess)
     }
 
     pub fn read_from_cache(&mut self, file_name: &str) -> Result<String> {
 
         if !self.cache.contains_key(file_name) {
-            return Err(std::io::Error::new(std::io::ErrorKind::InvalidInput, "File by name {file_name:s} is not in cache"))
+            return Err(std::io::Error::new(std::io::ErrorKind::InvalidInput, "File by name {file_name:?} is not in cache"))
         }
 
         let contents = String::from(self.cache.get(file_name).unwrap());
