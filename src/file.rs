@@ -1,7 +1,10 @@
 use std::fs::File;
+use std::fs::DirBuilder;
+use std::path::Path;
 use std::io::prelude::*;
 use std::collections::HashMap;
 use std::io::Result;
+
 
 #[derive(Debug)]
 pub enum Status {
@@ -94,6 +97,22 @@ impl FileSystem {
 
                 return Ok(Status::Success)
             },
+            Err(e) => return Err(e),
+        }
+    }
+
+    pub fn create_folder(&self, dir_name: &str) -> Result<Status> {
+        let path = Path::new(dir_name);
+
+        if !path.exists() && path.is_dir() {
+            return Err(std::io::Error::new(std::io::ErrorKind::AlreadyExists, "Dir already exists"));
+        }
+
+        let mut builder = DirBuilder::new();
+        builder.recursive(true);
+
+        match builder.create(dir_name) {
+            Ok(_) => return Ok(Status::Success),
             Err(e) => return Err(e),
         }
     }
