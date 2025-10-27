@@ -94,6 +94,7 @@ impl FileSystem {
         match file.write_all(contents.as_bytes()) {
             Ok(_) => {
                 self.cache.remove(file_name);
+                self.cache.shrink_to_fit();
 
                 return Ok(Status::Success)
             },
