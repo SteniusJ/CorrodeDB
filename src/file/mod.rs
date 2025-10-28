@@ -26,6 +26,7 @@ impl FileSystem {
     }
 
     /// Opens a file into cache
+    ///
     /// If file is in cache file is not opened again
     /// If file doesn't exist it is created
     pub fn open(&mut self, file_name: &str) -> Result<Status> {
@@ -54,7 +55,9 @@ impl FileSystem {
 
         Ok(Status::Success)
     }
-
+    
+    /// Writes data to cache if file is stored in cache
+    /// Overwrites Current data in cache with the new
     pub fn write_to_cache(&mut self, file_name: &str, new_content: String) -> Result<Status> {
         if !self.is_in_cache(file_name) {
             return Err(std::io::Error::new(std::io::ErrorKind::NotFound, "File not in cache"))
@@ -65,6 +68,8 @@ impl FileSystem {
         Ok(Status::Success)
     }
 
+    /// Returns file data from cache as a String
+    /// Returns error if file does not exist in cache
     pub fn read_from_cache(&mut self, file_name: &str) -> Result<String> {
         if !self.is_in_cache(file_name) {
             return Err(std::io::Error::new(std::io::ErrorKind::NotFound, "File not in cache"))
@@ -75,6 +80,7 @@ impl FileSystem {
         Ok(contents)
     }
 
+    /// Writes data for specified file from the cache to long term memory
     pub fn write_cache_to_disk(&mut self, file_name: &str) -> Result<Status> {
         if !self.is_in_cache(file_name) {
             return Err(std::io::Error::new(std::io::ErrorKind::NotFound, "File not in cache"))
@@ -102,6 +108,10 @@ impl FileSystem {
         }
     }
 
+    /// Creates new directory by dir_name
+    ///
+    /// dir_name can be the name of the last folder in a chain, and the folders will get made
+    /// recursively
     pub fn create_folder(&self, dir_name: &str) -> Result<Status> {
         let path = Path::new(dir_name);
 
@@ -118,10 +128,12 @@ impl FileSystem {
         }
     }
 
+    /// Adds data to cache
     fn add_to_cache(&mut self, file_name: String, file_contents: String) {
         self.cache.insert(file_name, file_contents);
     }
 
+    /// Returns true/false if data is already in cache
     fn is_in_cache(&mut self, file_name: &str) -> bool {
         if self.cache.contains_key(file_name) {
             return true
