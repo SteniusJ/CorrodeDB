@@ -16,17 +16,17 @@ fn main() {
      }
 
      match file_system.read_from_cache(TEST_FILE_PATH) {
-         Ok(contents) => println!("Read return: {contents}"),
+         Ok(contents) => println!("Read return: {contents:?}"),
          Err(e) => println!("Read failed: {e:?}"),
      }
 
-     match file_system.write_to_cache(TEST_FILE_PATH, "New content in cache".to_string()) {
+     match file_system.write_to_cache(TEST_FILE_PATH, "New content in cache\nrow2\nrow3".to_string()) {
          Ok(s) => println!("Write status: {s:?}"),
          Err(e) => println!("Write fail: {e:?}"),
      }
 
      match file_system.read_from_cache(TEST_FILE_PATH) {
-         Ok(contents) => println!("Read return: {contents}"),
+         Ok(contents) => println!("Read return: {contents:?}"),
          Err(e) => println!("Read failed: {e:?}"),
      }
 

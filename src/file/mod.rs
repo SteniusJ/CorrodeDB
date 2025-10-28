@@ -12,14 +12,14 @@ pub enum Status {
 }
 
 pub struct FileSystem {
-    cache: HashMap<String, String>,
+    cache: HashMap<String, Vec<String>>,
 }
 
 impl FileSystem {
 
     /// Creates new FileSystem
     pub fn new() -> FileSystem {
-        let new_cache: HashMap<String, String> = HashMap::new();
+        let new_cache: HashMap<String, Vec<String>> = HashMap::new();
         let file_system = FileSystem { cache: new_cache };
 
         file_system
@@ -51,7 +51,7 @@ impl FileSystem {
         let mut contents = String::new();
         file.read_to_string(&mut contents)?;
 
-        self.add_to_cache(file_name.to_string(), contents);
+        self.add_to_cache(file_name.to_string(), contents.lines().map(String::from).collect());
 
         Ok(Status::Success)
     }
@@ -63,19 +63,19 @@ impl FileSystem {
             return Err(std::io::Error::new(std::io::ErrorKind::NotFound, "File not in cache"))
         }
 
-        self.add_to_cache(file_name.to_string(), new_content);
+        self.add_to_cache(file_name.to_string(), new_content.lines().map(String::from).collect());
 
         Ok(Status::Success)
     }
 
     /// Returns file data from cache as a String
     /// Returns error if file does not exist in cache
-    pub fn read_from_cache(&mut self, file_name: &str) -> Result<String> {
+    pub fn read_from_cache(&mut self, file_name: &str) -> Result<Vec<String>> {
         if !self.is_in_cache(file_name) {
             return Err(std::io::Error::new(std::io::ErrorKind::NotFound, "File not in cache"))
         }
 
-        let contents = String::from(self.cache.get(file_name).unwrap());
+        let contents = self.cache.get(file_name).unwrap().clone();
 
         Ok(contents)
     }
@@ -93,9 +93,7 @@ impl FileSystem {
             Err(e) => return Err(e),
         }
 
-        let contents = String::from(self.cache.get(file_name).unwrap());
-
-        println!("File contents: {contents}");
+        let contents = self.cache.get(file_name).unwrap().clone().join("\n");
 
         match file.write_all(contents.as_bytes()) {
             Ok(_) => {
@@ -129,7 +127,7 @@ impl FileSystem {
     }
 
     /// Adds data to cache
-    fn add_to_cache(&mut self, file_name: String, file_contents: String) {
+    fn add_to_cache(&mut self, file_name: String, file_contents: Vec<String>) {
         self.cache.insert(file_name, file_contents);
     }
 
