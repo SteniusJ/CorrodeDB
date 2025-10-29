@@ -20,9 +20,10 @@ impl FileSystem {
     /// Creates new FileSystem
     pub fn new() -> FileSystem {
         let new_cache: HashMap<String, Vec<String>> = HashMap::new();
-        let file_system = FileSystem { cache: new_cache };
-
-        file_system
+        
+        FileSystem {
+            cache: new_cache
+        }
     }
 
     /// Opens a file into cache
