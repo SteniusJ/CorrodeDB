@@ -32,7 +32,7 @@ fn main() {
 
     match file_system.drop_from_cache(META_FILE_PATH) {
         Ok(status) => println!("Meta file removed from cache: {status:?}"),
-        Err(_) => (),
+        Err(e) => println!("Meta file drop failed: {e:?}"),
     }
 
     println!("-----------------------------");

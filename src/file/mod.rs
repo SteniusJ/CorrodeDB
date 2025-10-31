@@ -130,6 +130,10 @@ impl FileSystem {
     ///
     /// Should be used when file contents are no longer needed but no write to disk is necessary
     pub fn drop_from_cache(&mut self, file_name: &str) -> Result<Status> {
+        if !self.is_in_cache(file_name) {
+            return Err(std::io::Error::new(std::io::ErrorKind::NotFound, "File not in cache"))
+        }
+
         self.cache.remove(file_name);
         self.cache.shrink_to_fit();
 
