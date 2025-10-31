@@ -11,6 +11,7 @@ pub struct DBSettings {
     pub tables: HashMap<String, TableSettings>,
     pub cache_max_size: i16,
     pub cache_life_time: i16,
+    pub compartment_rows: i16,
 }
 
 #[derive(Debug)]
@@ -86,7 +87,8 @@ impl DBSettings {
         DBSettings {
             tables: table_map,
             cache_max_size: doc["settings"]["cache"]["max_size"].as_i64().unwrap() as i16,
-            cache_life_time: doc["settings"]["cache"]["life_time"].as_i64().unwrap() as i16
+            cache_life_time: doc["settings"]["cache"]["life_time"].as_i64().unwrap() as i16,
+            compartment_rows: doc["settings"]["compartment"]["rows"].as_i64().unwrap() as i16,
         }
     }
 }

@@ -5,7 +5,6 @@ use std::io::prelude::*;
 use std::collections::HashMap;
 use std::io::Result;
 
-
 #[derive(Debug)]
 pub enum Status {
     Success
@@ -125,6 +124,16 @@ impl FileSystem {
             Ok(_) => return Ok(Status::Success),
             Err(e) => return Err(e),
         }
+    }
+
+    /// Removes entry from cache and frees memory
+    ///
+    /// Should be used when file contents are no longer needed but no write to disk is necessary
+    pub fn drop_from_cache(&mut self, file_name: &str) -> Result<Status> {
+        self.cache.remove(file_name);
+        self.cache.shrink_to_fit();
+
+        Ok(Status::Success)
     }
 
     /// Adds data to cache
