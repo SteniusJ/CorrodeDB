@@ -102,17 +102,12 @@ fn main() {
      }
 
      // Http server testing
+     let mut http_server = http::HTTPServer::new("127.0.0.1:7878".to_string());
+
      fn endpoint1() -> String {
-         let status = "HTTP/1.1 200 OK";
-         let contents = "{\"msg\":\"hello from rust!\"}";
-         let length = contents.len();
-
-         format!("{status}\r\nContent-Length: {length}\r\nContent-Type: application/json\r\n\r\n{contents}")
+         http::create_http_response(200, "{\"msg\":\"hello from rust!\"}", "application/json")
      }
+     http_server.add_endpoint("/".to_string(), http::HTTPRequestMethods::GET, endpoint1);
 
-     let mut endpoints: HashMap<(String, http::HTTPRequestMethods), fn() -> String> = HashMap::new();
-
-     endpoints.insert(("/".to_string(), http::HTTPRequestMethods::GET), endpoint1);
-
-     http::listen("127.0.0.1:7878", endpoints);
+     http_server.listen();
 }
