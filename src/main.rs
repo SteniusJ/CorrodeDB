@@ -105,7 +105,7 @@ fn main() {
      let mut http_server = http::HTTPServer::new("127.0.0.1:7878".to_string());
 
      fn endpoint1() -> String {
-         http::create_http_response(200, "{\"msg\":\"hello from rust!\"}", "application/json")
+         http::create_http_response(200, "application/json", "{\"msg\":\"hello from rust!\"}")
      }
      http_server.add_endpoint("/".to_string(), http::HTTPRequestMethods::GET, endpoint1);
 

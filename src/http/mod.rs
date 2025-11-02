@@ -14,14 +14,14 @@ pub enum HTTPRequestMethods {
     NONE,
 }
 
-struct HTTPRequest {
-    method: HTTPRequestMethods,
-    endpoint: String, 
-}
-
 pub struct HTTPServer {
     endpoints: HashMap<(String, HTTPRequestMethods), fn() -> String>,
     address: String,
+}
+
+struct HTTPRequest {
+    method: HTTPRequestMethods,
+    endpoint: String, 
 }
 
 impl HTTPServer {
@@ -44,14 +44,17 @@ impl HTTPServer {
             let request_line = buf_reader.lines().next().unwrap().unwrap();
             let http_request = parse_request(request_line.as_str());
 
-            let endpoint = self.endpoints.get(&(http_request.endpoint, http_request.method)).unwrap();
+            let endpoint = match self.endpoints.get(&(http_request.endpoint, http_request.method)) {
+                Some(ep) => ep(),
+                None => create_http_response(404, "text/html; charset=utf-8", "Endpoint not found"),
+            };
 
-            stream.write_all(endpoint().as_bytes()).unwrap();
+            stream.write_all(endpoint.as_bytes()).unwrap();
         }
     }
 }
 
-pub fn create_http_response(status_code: u16, content: &str, content_type: &str) -> String {
+pub fn create_http_response(status_code: u16, content_type: &str, content: &str) -> String {
     format!("{}\r\nContent-Length: {}\r\nContent-Type: {}\r\n\r\n{}", parse_http_status_code(status_code), content.len(), content_type, content)
 }
 
