@@ -1,5 +1,8 @@
+use std::collections::HashMap;
+
 mod file;
 mod meta;
+mod http;
 
 const TEST_FILE_PATH: &str = "./tables/test";
 const META_FILE_PATH: &str = "./meta.yaml";
@@ -97,4 +100,19 @@ fn main() {
          Ok(s) => println!("File disk write status: {s:?}"),
          Err(e) => println!("File open failed: {e:?}"),
      }
+
+     // Http server testing
+     fn endpoint1() -> String {
+         let status = "HTTP/1.1 200 OK";
+         let contents = "{\"msg\":\"hello from rust!\"}";
+         let length = contents.len();
+
+         format!("{status}\r\nContent-Length: {length}\r\nContent-Type: application/json\r\n\r\n{contents}")
+     }
+
+     let mut endpoints: HashMap<(String, http::HTTPRequestMethods), fn() -> String> = HashMap::new();
+
+     endpoints.insert(("/".to_string(), http::HTTPRequestMethods::GET), endpoint1);
+
+     http::listen("127.0.0.1:7878", endpoints);
 }
