@@ -104,10 +104,18 @@ fn main() {
      // Http server testing
      let mut http_server = http::HTTPServer::new("127.0.0.1:7878".to_string());
 
-     fn endpoint1() -> String {
+     fn endpoint1(_: String) -> String {
          http::create_http_response(200, "application/json", "{\"msg\":\"hello from rust!\"}")
      }
      http_server.add_endpoint("/".to_string(), http::HTTPRequestMethods::GET, endpoint1);
+
+     fn post_endpoint(body: String) -> String {
+         match body.parse::<i64>() {
+             Ok(num) => http::create_http_response(200, "application/json", format!("{{\"msg\": \"string: '{}' is a number!\"}}", num).as_str()),
+             Err(_) => http::create_http_response(404, "application/json", "{\"msg\":\"not a number!\"}"),
+         }
+     }
+     http_server.add_endpoint("/".to_string(), http::HTTPRequestMethods::POST, post_endpoint);
 
      http_server.listen();
 }

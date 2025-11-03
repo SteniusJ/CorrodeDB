@@ -4,7 +4,7 @@ use std::{
     collections::HashMap,
 };
 
-#[derive(Eq, Hash, PartialEq)]
+#[derive(Eq, Hash, PartialEq, Debug)]
 pub enum HTTPRequestMethods {
     GET,
     POST,
@@ -15,13 +15,17 @@ pub enum HTTPRequestMethods {
 }
 
 pub struct HTTPServer {
-    endpoints: HashMap<(String, HTTPRequestMethods), fn() -> String>,
+    endpoints: HashMap<(String, HTTPRequestMethods), fn(String) -> String>,
     address: String,
 }
 
-struct HTTPRequest {
+#[derive(Debug)]
+struct HTTPRequestHeader {
     method: HTTPRequestMethods,
-    endpoint: String, 
+    endpoint: String,
+    content_type: String,
+    content_length: u64,
+    content: String,
 }
 
 impl HTTPServer {
@@ -31,7 +35,7 @@ impl HTTPServer {
             address: address,
         }
     }
-    pub fn add_endpoint(&mut self, enpoint: String, method: HTTPRequestMethods, function: fn() -> String) {
+    pub fn add_endpoint(&mut self, enpoint: String, method: HTTPRequestMethods, function: fn(String) -> String) {
         self.endpoints.insert((enpoint, method), function);
     }
     pub fn listen(&self) {
@@ -41,11 +45,12 @@ impl HTTPServer {
             let mut stream = stream.unwrap();
             let buf_reader = BufReader::new(&stream);
 
-            let request_line = buf_reader.lines().next().unwrap().unwrap();
-            let http_request = parse_request(request_line.as_str());
+            let request_header = parse_http_request_header(buf_reader.lines().into_iter());
 
-            let endpoint = match self.endpoints.get(&(http_request.endpoint, http_request.method)) {
-                Some(ep) => ep(),
+            println!("{request_header:?}");
+
+            let endpoint = match self.endpoints.get(&(request_header.endpoint, request_header.method)) {
+                Some(ep) => ep(request_header.content),
                 None => create_http_response(404, "text/html; charset=utf-8", "Endpoint not found"),
             };
 
@@ -81,12 +86,45 @@ fn parse_http_status_code(code: u16) -> String {
     }
 }
 
-/// Parses the first line of a http header in order to build a HTTPRequest struct
-fn parse_request(request_line: &str) -> HTTPRequest {
-    let rs: Vec<&str> = request_line.split(" ").collect();
+fn parse_http_request_header(header_iter: std::io::Lines<BufReader<&TcpStream>>) -> HTTPRequestHeader {
+    let mut request_header = HTTPRequestHeader {
+        method: HTTPRequestMethods::NONE,
+        endpoint: String::new(),
+        content_type: String::new(),
+        content_length: 0,
+        content: String::new(),
+    };
 
-    HTTPRequest {
-        method: parse_http_method(rs.get(0).unwrap()),
-        endpoint: rs.get(1).unwrap().to_string()
+    let mut building_content = false;
+    let mut content_length: u64 = 0;
+    for line_result in header_iter.enumerate() {
+        let line = line_result.1.unwrap();
+        let line_split: Vec<&str> = line.split(": ").collect();
+
+        if building_content {
+            content_length += line.len() as u64 + 2; // adding 2 for the newline characters "\n"
+            request_header.content += format!("{}", line).as_str();
+
+            if content_length == request_header.content_length {
+                return request_header;
+            }
+        }
+
+        if line_result.0 == 0 {
+            let line_split: Vec<&str> = line.split_whitespace().collect();
+
+            request_header.method = parse_http_method(line_split.get(0).unwrap());
+            request_header.endpoint = line_split.get(1).unwrap().to_string();
+            continue;
+        }
+
+        match *line_split.get(0).unwrap() {
+            "Content-Type" => request_header.content_type = line_split.get(1).unwrap().to_string(),
+            "Content-Length" => request_header.content_length = line_split.get(1).unwrap().parse().unwrap(),
+            "" => building_content = true,
+            _ => (),
+        }
     }
+
+    request_header
 }
