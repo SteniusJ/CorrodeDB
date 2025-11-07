@@ -92,3 +92,27 @@ impl DBSettings {
         }
     }
 }
+
+pub fn load_meta(mut file_system: crate::file::FileSystem, meta_file_path: &str) -> DBSettings {
+    match file_system.open(meta_file_path) {
+        Ok(status) => println!("Meta file open status: {status:?}"),
+        Err(e) => panic!("Meta file open failed: {e:?}"),
+    }
+
+    let test_config_yaml = match file_system.read_from_cache(meta_file_path) {
+        Ok(contents) => {
+            println!("Meta file read success");
+            contents.join("\n")
+        },
+        Err(e) => panic!("Meta file read failed: {e:?}"),
+    };
+
+    match file_system.drop_from_cache(meta_file_path) {
+        Ok(status) => println!("Meta file removed from cache: {status:?}"),
+        Err(e) => println!("Meta file drop failed: {e:?}"),
+    }
+
+    println!("-----------------------------");
+
+    DBSettings::new(test_config_yaml.as_str())
+}

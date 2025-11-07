@@ -1,12 +1,29 @@
-use std::collections::HashMap;
-
 mod file;
 mod meta;
 mod http;
+mod query;
 
 const TEST_FILE_PATH: &str = "./tables/test";
 const META_FILE_PATH: &str = "./meta.yaml";
 
+fn main() {
+    let mut file_system = file::FileSystem::new();
+    let mut http_server = http::HTTPServer::new("127.0.0.1:7878".to_string());
+    let db_settings = meta::load_meta(file_system, META_FILE_PATH);
+
+    http_server.add_endpoint("/".to_string(), http::HTTPRequestMethods::POST, {
+        fn ep(content: String) -> String {
+            http::create_http_response(200, "application/json", format!("{{\"msg\":\"you sent '{}' to the server\"}}", content).as_str())
+        }
+        ep
+    });
+
+    query::parse_query("from(thing).get(thang)");
+
+    http_server.listen();
+}
+
+/*
 fn main() {
     // Init new filesystem
     let mut file_system = file::FileSystem::new();
@@ -119,3 +136,5 @@ fn main() {
 
      http_server.listen();
 }
+*/
+
