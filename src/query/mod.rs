@@ -1,13 +1,26 @@
-pub fn parse_query(query_str: &str) {
-    let functions: Vec<&str> = query_str.split(".").collect();
+use regex::Regex;
 
+pub fn parse_query(query_str: &str) {
+    //let functions: Vec<&str> = query_str.split(".").collect();
+
+    let re = Regex::new(r"([^\W]*)\(([[:alnum:]\\',. ]*)\)").unwrap();
+
+    for item in re.captures_iter(query_str) {
+        println!("{item:?}");
+    }
+}
+/*
     for function in functions.iter() {
         let mut fn_name: String = String::new();
         let mut params: Vec<&str> = Vec::new();
 
         let mut char_iter = function.chars().into_iter();
 
-        // Replace some loops with this regex: [^\W]\w*.
+        // Replace some loops with this regex: ([^\W]*)\(([[:alnum:]\\',. ]*)\)
+        
+
+
+
         loop {
             let char = match char_iter.next() {
                 Some(char) => char,
@@ -51,3 +64,4 @@ fn parse_params(char_iter: std::str::Chars<'_>) -> Vec<&str> {
 
     params
 }
+*/

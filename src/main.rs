@@ -3,13 +3,13 @@ mod meta;
 mod http;
 mod query;
 
-const TEST_FILE_PATH: &str = "./tables/test";
+const _TEST_FILE_PATH: &str = "./tables/test";
 const META_FILE_PATH: &str = "./meta.yaml";
 
 fn main() {
-    let mut file_system = file::FileSystem::new();
+    let mut _file_system = file::FileSystem::new();
     let mut http_server = http::HTTPServer::new("127.0.0.1:7878".to_string());
-    let db_settings = meta::load_meta(file_system, META_FILE_PATH);
+    let _db_settings = meta::load_meta(_file_system, META_FILE_PATH);
 
     http_server.add_endpoint("/".to_string(), http::HTTPRequestMethods::POST, {
         fn ep(content: String) -> String {
