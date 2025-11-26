@@ -18,7 +18,8 @@ fn main() {
         ep
     });
 
-    query::parse_query("from(thing).get(thang)");
+    let res = query::parse_query("from(thing,tong).get(thang)");
+    println!("{res:?}");
 
     http_server.listen();
 }
