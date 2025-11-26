@@ -1,0 +1,34 @@
+tables: # all db tables come under here
+  messages: # table 1
+    rows: # rows of table "messages" come here
+      id: # row 1 "id"
+        value: Number # value type of row 1
+        primary_key: true # is primary key
+        auto_iterate: true # is auto iterable
+      message: # row 2 "message"
+        value: VarChar
+      time_posted: # row 3 "value"
+        value: VarChar
+  reactions: # table 2
+    rows:
+      id:
+        value: Number
+        primary_key: true
+        auto_iterate: true
+      reaction:
+        value: VarChar
+  images: # table 3
+    rows:
+      id:
+        value: Number
+        primary_key: true
+        auto_iterate: true
+      image_link:
+        value: VarChar
+
+settings: # settings for the db application come here
+  cache:
+    max_size: 2042 # Bytes
+    life_time: 300 # Seconds
+  compartment:
+    rows: 50 # Amount of rows per db compartment
