@@ -91,9 +91,14 @@ impl DBSettings {
             compartment_rows: doc["settings"]["compartment"]["rows"].as_i64().unwrap() as i16,
         }
     }
+    pub fn table_exists(&self, table_name: &String) -> bool {
+        self.tables.contains_key(table_name)
+    }
 }
 
-pub fn load_meta(mut file_system: crate::file::FileSystem, meta_file_path: &str) -> DBSettings {
+pub fn load_meta(meta_file_path: &str) -> DBSettings {
+    let mut file_system = crate::file::FileSystem::new();
+
     match file_system.open(meta_file_path) {
         Ok(status) => println!("Meta file open status: {status:?}"),
         Err(e) => panic!("Meta file open failed: {e:?}"),
