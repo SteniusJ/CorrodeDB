@@ -7,18 +7,64 @@ const _TEST_FILE_PATH: &str = "./tables/test";
 const META_FILE_PATH: &str = "./meta.yaml";
 
 fn main() {
-    let mut _file_system = file::FileSystem::new();
+    let mut file_system = file::FileSystem::new();
     let mut http_server = http::HTTPServer::new("127.0.0.1:7878".to_string());
-    let _db_settings = meta::load_meta(_file_system, META_FILE_PATH);
+    let db_settings = meta::load_meta(META_FILE_PATH);
 
+    http_server.add_endpoint("/", http::HTTPRequestMethods::POST, {
+        fn ep(body: String) -> String {
+            let query = match query::parse_query(body.as_str()) {
+                Ok(query) => query,
+                Err(e) => {
+                    println!("{e}");
+                    return http::create_http_response(400, "application/json", "\"err\":\"Query could not be parsed\"");
+                }
+            };
+
+            println!("{query:?}");
+
+            if !db_settings.table_exists(&query.0) {
+                return http::create_http_response(400, "application/json", "\"err\":\"Given table does not exist\"");
+            }
+
+            String::new()
+        }
+        ep
+    });
+
+    /* For reference!!!!
     http_server.add_endpoint("/".to_string(), http::HTTPRequestMethods::POST, {
         fn ep(content: String) -> String {
             http::create_http_response(200, "application/json", format!("{{\"msg\":\"you sent '{}' to the server\"}}", content).as_str())
         }
         ep
     });
+    */
 
-    let res = query::parse_query("from(thing,tong).get(thang)");
+    // testing of db query chain
+    let res = query::parse_query("messages[10]").unwrap();
+    println!("{res:?}");
+
+    let table_existence = db_settings.table_exists(&res.0); // checks if table exists
+    println!("{table_existence:?}");
+    
+    match file_system.open("./tables/messages/0") {
+        Ok(_) => (),
+        Err(e) => {
+            println!("{e}");
+        }
+    }
+
+    match file_system.read_line_from_cache("./tables/messages/0", 2) {
+        Ok(string) => {
+            println!("{string}");
+        },
+        Err(e) => {
+            println!("{e}");
+        }
+    }
+
+    let res = query::parse_query("messages[10,11,2].random()").unwrap();
     println!("{res:?}");
 
     http_server.listen();
