@@ -15,7 +15,6 @@ pub struct FileSystem {
 }
 
 impl FileSystem {
-
     /// Creates new FileSystem
     pub fn new() -> FileSystem {
         let new_cache: HashMap<String, Vec<String>> = HashMap::new();
@@ -78,6 +77,23 @@ impl FileSystem {
         let contents = self.cache.get(file_name).unwrap().clone();
 
         Ok(contents)
+    }
+
+    pub fn read_line_from_cache(&mut self, file_name: &str, line: usize) -> Result<String> {
+        let line = line - 1;
+
+        match self.read_from_cache(file_name) {
+            Ok(file_contents) => {
+                if file_contents.len() >= line {
+                    let line_string = file_contents[line].clone();
+                    return Ok(line_string);
+                }
+                return Err(std::io::Error::new(std::io::ErrorKind::NotFound, "Line number outside file size"))
+            },
+            Err(e) => {
+                return Err(e);
+            }
+        }
     }
 
     /// Writes data for specified file from the cache to long term memory
