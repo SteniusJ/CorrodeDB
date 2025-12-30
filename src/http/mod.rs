@@ -35,8 +35,8 @@ impl HTTPServer {
             address: address,
         }
     }
-    pub fn add_endpoint(&mut self, enpoint: String, method: HTTPRequestMethods, function: fn(String) -> String) {
-        self.endpoints.insert((enpoint, method), function);
+    pub fn add_endpoint(&mut self, enpoint: &str, method: HTTPRequestMethods, function: fn(String) -> String) {
+        self.endpoints.insert((enpoint.to_string(), method), function);
     }
     pub fn listen(&self) {
         let listener = create_tcp_listener(self.address.as_str());
