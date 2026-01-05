@@ -156,16 +156,20 @@ impl FileSystem {
         Ok(Status::Success)
     }
 
-    /// Adds data to cache
-    fn add_to_cache(&mut self, file_name: String, file_contents: Vec<String>) {
-        self.cache.insert(file_name, file_contents);
-    }
-
     /// Returns true/false if data is already in cache
-    fn is_in_cache(&mut self, file_name: &str) -> bool {
+    pub fn is_in_cache(&mut self, file_name: &str) -> bool {
         if self.cache.contains_key(file_name) {
             return true
         }
         false
+    }
+
+    pub fn get_cached_files(&self) -> std::collections::hash_map::Keys<'_, String, Vec<String>> {
+        self.cache.keys()
+    }
+
+    /// Adds data to cache
+    fn add_to_cache(&mut self, file_name: String, file_contents: Vec<String>) {
+        self.cache.insert(file_name, file_contents);
     }
 }
