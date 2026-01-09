@@ -122,6 +122,29 @@ impl FileSystem {
         }
     }
 
+    pub fn write_entire_cache_to_disk(&mut self) -> Result<Status> {
+        let keys: Vec<String> = self.cache.keys().cloned().collect();
+
+        for file_path in keys {
+            let mut file = match File::create(&file_path) {
+                Ok(f) => f,
+                Err(_) => continue,
+            };
+
+            if let Some(contents) = self.cache.get(&file_path) {
+                let contents = contents.clone().join("\n");
+                if file.write_all(contents.as_bytes()).is_err() {
+                    continue;
+                }
+            }
+
+            self.cache.remove(&file_path);
+        }
+
+        self.cache.shrink_to_fit();
+        Ok(Status::Success)
+    }
+
     /// Creates new directory by dir_name
     ///
     /// dir_name can be the name of the last folder in a chain, and the folders will get made
