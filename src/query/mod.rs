@@ -3,10 +3,10 @@ use std::io::Result;
 
 #[derive(Debug)]
 pub struct QueryResult {
-    table_name: String,
-    indexes: Vec<u64>,
-    fn_name: String,
-    fn_param: String,
+    pub table_name: String,
+    pub indexes: Vec<u64>,
+    pub fn_name: String,
+    pub fn_param: String,
 }
 
 pub fn parse_query(query_str: &str) -> Result<QueryResult> {
