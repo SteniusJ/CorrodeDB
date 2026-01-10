@@ -80,7 +80,7 @@ impl FileSystem {
     }
 
     pub fn read_line_from_cache(&mut self, file_name: &str, line: usize) -> Result<String> {
-        let line = line - 1;
+        let line = line;
 
         match self.read_from_cache(file_name) {
             Ok(file_contents) => {
