@@ -80,7 +80,7 @@ impl FileSystem {
     }
 
     pub fn read_line_from_cache(&mut self, file_name: &str, line: usize) -> Result<String> {
-        let line = line - 1;
+        let line = line;
 
         match self.read_from_cache(file_name) {
             Ok(file_contents) => {
@@ -122,6 +122,29 @@ impl FileSystem {
         }
     }
 
+    pub fn write_entire_cache_to_disk(&mut self) -> Result<Status> {
+        let keys: Vec<String> = self.cache.keys().cloned().collect();
+
+        for file_path in keys {
+            let mut file = match File::create(&file_path) {
+                Ok(f) => f,
+                Err(_) => continue,
+            };
+
+            if let Some(contents) = self.cache.get(&file_path) {
+                let contents = contents.clone().join("\n");
+                if file.write_all(contents.as_bytes()).is_err() {
+                    continue;
+                }
+            }
+
+            self.cache.remove(&file_path);
+        }
+
+        self.cache.shrink_to_fit();
+        Ok(Status::Success)
+    }
+
     /// Creates new directory by dir_name
     ///
     /// dir_name can be the name of the last folder in a chain, and the folders will get made
@@ -156,16 +179,25 @@ impl FileSystem {
         Ok(Status::Success)
     }
 
-    /// Adds data to cache
-    fn add_to_cache(&mut self, file_name: String, file_contents: Vec<String>) {
-        self.cache.insert(file_name, file_contents);
+    pub fn drop_entire_cache(&mut self) {
+        self.cache.clear();
+        self.cache.shrink_to_fit();
     }
 
     /// Returns true/false if data is already in cache
-    fn is_in_cache(&mut self, file_name: &str) -> bool {
+    pub fn is_in_cache(&mut self, file_name: &str) -> bool {
         if self.cache.contains_key(file_name) {
             return true
         }
         false
+    }
+
+    pub fn get_cached_files(&self) -> std::collections::hash_map::Keys<'_, String, Vec<String>> {
+        self.cache.keys()
+    }
+
+    /// Adds data to cache
+    fn add_to_cache(&mut self, file_name: String, file_contents: Vec<String>) {
+        self.cache.insert(file_name, file_contents);
     }
 }

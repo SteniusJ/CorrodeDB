@@ -14,8 +14,8 @@ pub enum HTTPRequestMethods {
     NONE,
 }
 
-pub struct HTTPServer {
-    endpoints: HashMap<(String, HTTPRequestMethods), fn(String) -> String>,
+pub struct HTTPServer<'a> {
+    endpoints: HashMap<(String, HTTPRequestMethods), Box<dyn FnMut(String) -> String + 'a>>,
     address: String,
 }
 
@@ -28,17 +28,17 @@ struct HTTPRequestHeader {
     content: String,
 }
 
-impl HTTPServer {
-    pub fn new(address: String) -> HTTPServer {
+impl<'a> HTTPServer<'a> {
+    pub fn new(address: String) -> HTTPServer<'a> {
         HTTPServer {
             endpoints: HashMap::new(),
             address: address,
         }
     }
-    pub fn add_endpoint(&mut self, enpoint: &str, method: HTTPRequestMethods, function: fn(String) -> String) {
-        self.endpoints.insert((enpoint.to_string(), method), function);
+    pub fn add_endpoint(&mut self, enpoint: &str, method: HTTPRequestMethods, closure: impl FnMut(String) -> String + 'a) {
+        self.endpoints.insert((enpoint.to_string(), method), Box::new(closure));
     }
-    pub fn listen(&self) {
+    pub fn listen(&mut self) {
         let listener = create_tcp_listener(self.address.as_str());
 
         for stream in listener.incoming() {
@@ -49,7 +49,7 @@ impl HTTPServer {
 
             println!("{request_header:?}");
 
-            let endpoint = match self.endpoints.get(&(request_header.endpoint, request_header.method)) {
+            let endpoint = match self.endpoints.get_mut(&(request_header.endpoint, request_header.method)) {
                 Some(ep) => ep(request_header.content),
                 None => create_http_response(404, "text/html; charset=utf-8", "Endpoint not found"),
             };
