@@ -26,32 +26,39 @@ fn main() {
 
         println!("{query:?}");
 
-        if !db_settings.table_exists(&query.0) {
+        if !db_settings.table_exists(&query.table_name) {
             return http::create_http_response(400, "application/json", "\"err\":\"Given table does not exist\"");
         }
 
-        // calculate container and which line in said container has the value
-        // TODO! apply this calculation to all indexes given
-        let container = num::integer::div_floor(query.1[0], db_settings.compartment_rows as u64);
-        let line = if query.1[0] < db_settings.compartment_rows as u64 {query.1[0]} else {query.1[0] - db_settings.compartment_rows as u64};
+        let mut result: Vec<String> = Vec::new();
+        for index in &query.indexes {
+            let container = num::integer::div_floor(*index, db_settings.compartment_rows as u64);
+            let line = if *index < db_settings.compartment_rows as u64 {*index} else {*index - db_settings.compartment_rows as u64};
+            let file_name = format!("./tables/{}/{}", query.table_name, container);
 
-        match file_system.open(format!("./tables/{}/{}", &query.0, container).as_str()) {
-            Ok(status) => println!("{status:?}"),
-            Err(e) => {
-                println!("{e}");
-                return http::create_http_response(400, "application/json", "\"err\":\"file open error\"");
+            if !file_system.is_in_cache(file_name.as_str()) {
+                match file_system.open(file_name.as_str()) {
+                    Ok(status) => println!("{status:?}"),
+                    Err(e) => {
+                        println!("{e}");
+                        continue; //todo proper error handling here and rollback for changes incase
+                                  //of failiure
+                    }
+                } 
+            }
+
+            match file_system.read_line_from_cache(file_name.as_str(), line as usize) {
+                Ok(content) => result.push(content),
+                Err(e) => {
+                    println!("{e}");
+                    continue;
+                }
             }
         }
-        
-        match file_system.read_line_from_cache(format!("./tables/{}/{}", &query.0, container).as_str(), line as usize) {
-            Ok(content) => {
-                println!("{content}");
-                return http::create_http_response(200, "application/json", format!("\"res\":\"{}\"", content).as_str());
-            },
-            Err(e) => {
-                println!("{e}");
-                return http::create_http_response(400, "application/json", "\"err\":\"line read error\"");
-            }
-        }
+
+        file_system.drop_entire_cache();
+        http::create_http_response(200, "application/json", result.join("\n").as_str())
     });
+
+    http_server.listen();
 }
