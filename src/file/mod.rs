@@ -179,6 +179,11 @@ impl FileSystem {
         Ok(Status::Success)
     }
 
+    pub fn drop_entire_cache(&mut self) {
+        self.cache.clear();
+        self.cache.shrink_to_fit();
+    }
+
     /// Returns true/false if data is already in cache
     pub fn is_in_cache(&mut self, file_name: &str) -> bool {
         if self.cache.contains_key(file_name) {
