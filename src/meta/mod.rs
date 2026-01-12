@@ -1,4 +1,4 @@
-use yaml_rust2::{YamlLoader};
+use yaml_rust2::YamlLoader;
 use std::collections::HashMap;
 
 #[derive(Clone, Copy, Debug)]
@@ -17,6 +17,7 @@ pub struct DBSettings {
 #[derive(Debug)]
 pub struct TableSettings {
     pub rows: HashMap<String, RowSettings>,
+    pub biggest_id: u64,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -79,6 +80,7 @@ impl DBSettings {
 
             let table_settings = TableSettings {
                 rows: row_map.clone(),
+                biggest_id: 0,
             };
 
             table_map.insert(table_name.to_string(), table_settings);
@@ -97,10 +99,12 @@ impl DBSettings {
 }
 
 pub fn load_meta(meta_file_path: &str) -> DBSettings {
+    println!("loading settings yaml file from: {meta_file_path}\n");
+
     let mut file_system = crate::file::FileSystem::new();
 
     match file_system.open(meta_file_path) {
-        Ok(status) => println!("Meta file open status: {status:?}"),
+        Ok(status) => println!("Meta file open: {status:?}"),
         Err(e) => panic!("Meta file open failed: {e:?}"),
     }
 
@@ -113,11 +117,42 @@ pub fn load_meta(meta_file_path: &str) -> DBSettings {
     };
 
     match file_system.drop_from_cache(meta_file_path) {
-        Ok(status) => println!("Meta file removed from cache: {status:?}"),
+        Ok(status) => println!("Meta file remove from cache: {status:?}"),
         Err(e) => println!("Meta file drop failed: {e:?}"),
     }
 
-    println!("-----------------------------");
+    let mut db_settings = DBSettings::new(test_config_yaml.as_str());
 
-    DBSettings::new(test_config_yaml.as_str())
+    println!("------------ settings loaded --------------\ninitializing db directories\n");
+
+    for table in &mut db_settings.tables {
+        let table_name = table.0;
+        println!("configuring directory for: {table_name}");
+
+        match file_system.create_folder(format!("./tables/{table_name}").as_str()) {
+            Ok(_) => println!("created folder for table: {table_name}"),
+            Err(e) => {
+                println!("folder creation for table: {table_name} failed due to error: {e}");
+                if e.kind() == std::io::ErrorKind::AlreadyExists {
+                    let last_file_name = file_system.read_folder(format!("./tables/{table_name}").as_str()).last().unwrap().unwrap().file_name().into_string().unwrap();
+
+                    file_system.open("./tables/{table_name/{last_file_name}}").unwrap();
+                    let file_contents = file_system.read_from_cache(format!("./tables/{table_name}/{last_file_name}").as_str()).unwrap();
+
+
+                    let latest_index = {
+                        let last_file_index: u64 = last_file_name.parse().unwrap();
+                        (db_settings.compartment_rows as u64 * last_file_index) + file_contents.len() as u64 - 1
+                    };
+
+                    table.1.biggest_id = latest_index;
+                    println!("biggest id for table: {table_name} is {latest_index}");
+                }
+            }
+        }
+        println!();
+    }
+
+    println!("--------- db setup finished ---------\n");
+    db_settings
 }
