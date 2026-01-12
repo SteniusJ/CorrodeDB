@@ -40,6 +40,8 @@ impl<'a> HTTPServer<'a> {
     }
     pub fn listen(&mut self) {
         let listener = create_tcp_listener(self.address.as_str());
+        
+        println!("http server listening on: {}", self.address.as_str());
 
         for stream in listener.incoming() {
             let mut stream = stream.unwrap();
