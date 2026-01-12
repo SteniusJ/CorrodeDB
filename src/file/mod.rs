@@ -1,5 +1,8 @@
-use std::fs::File;
-use std::fs::DirBuilder;
+use std::fs::{
+    File,
+    DirBuilder,
+    ReadDir,
+};
 use std::path::Path;
 use std::io::prelude::*;
 use std::collections::HashMap;
@@ -152,7 +155,7 @@ impl FileSystem {
     pub fn create_folder(&self, dir_name: &str) -> Result<Status> {
         let path = Path::new(dir_name);
 
-        if !path.exists() && path.is_dir() {
+        if path.exists() && path.is_dir() {
             return Err(std::io::Error::new(std::io::ErrorKind::AlreadyExists, "Dir already exists"));
         }
 
@@ -163,6 +166,11 @@ impl FileSystem {
             Ok(_) => return Ok(Status::Success),
             Err(e) => return Err(e),
         }
+    }
+
+    pub fn read_folder(&self, dir_name: &str) -> ReadDir {
+        let path = Path::new(dir_name);
+        path.read_dir().unwrap()
     }
 
     /// Removes entry from cache and frees memory
