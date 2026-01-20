@@ -75,7 +75,7 @@ fn read_from_db(db_settings: &meta::DBSettings, file_system: &mut file::FileSyst
     http::create_http_response(200, "application/json", result.join("\n").as_str())
 }
 
-fn write_to_db(db_settings: &meta::DBSettings, file_system: &mut file::FileSystem, query: &query::QueryResult) -> String {
+fn write_to_db(db_settings: &mut meta::DBSettings, file_system: &mut file::FileSystem, query: &query::QueryResult) -> String {
     if query.indexes.len() > 1 {
         return http::create_http_response(400, "application/json", "\"err\":\"data can only be written to one index at a time\"");
     }
@@ -115,7 +115,41 @@ fn write_to_db(db_settings: &meta::DBSettings, file_system: &mut file::FileSyste
             }
         },
         query::IndexType::Wildcard => {
-            return http::create_http_response(400, "application/json", "\"err\":\"non implemented feature\"");
+            let table_max_index = db_settings.tables.get(&query.table_name).unwrap().biggest_id + 1;
+            let container = num::integer::div_floor(table_max_index, db_settings.compartment_rows as u64);
+            let line = if table_max_index < db_settings.compartment_rows as u64 {table_max_index} else {table_max_index - db_settings.compartment_rows as u64};
+            let file_name = format!("./tables{}/{}", query.table_name, container);
+
+            match file_system.open(file_name.as_str()) {
+                Ok(status) => println!("{status:?}"),
+                Err(_) => {
+                    return http::create_http_response(400, "application/json", "\"err\":\"file open error\"");
+                }
+            }
+
+            let mut file_data = match file_system.read_from_cache(file_name.as_str()) {
+                Ok(f) => f,
+                Err(_) => {
+                    return http::create_http_response(400, "application/json", "\"err\":\"file read error\"");
+                }
+            };
+
+            file_data[line as usize] = query.fn_param.clone();
+
+            match file_system.write_to_cache(file_name.as_str(), file_data.join("\n")) {
+                Ok(s) => println!("{s:?}"),
+                Err(_) => {
+                    return http::create_http_response(400, "application/json", "\"err\":\"cache write error\"");
+                }
+            }
+    
+            match file_system.write_entire_cache_to_disk() {
+                Ok(_) => {
+                    db_settings.iterate_id(&query.table_name);
+                    return http::create_http_response(200, "application/json", format!("\"status\":\"write success new id {table_max_index}\"").as_str());
+                }
+                Err(_) => return http::create_http_response(400, "application/json", "\"err\":\"write failed\""), 
+            }
         },
     }
 }
