@@ -96,6 +96,15 @@ impl DBSettings {
     pub fn table_exists(&self, table_name: &String) -> bool {
         self.tables.contains_key(table_name)
     }
+    pub fn iterate_id(&mut self, table_name: &String) {
+        self.tables.get_mut(table_name).unwrap().iterate_id();
+    }
+}
+
+impl TableSettings {
+    fn iterate_id(&mut self) {
+        self.biggest_id += 1;
+    }
 }
 
 pub fn load_meta(meta_file_path: &str) -> DBSettings {
