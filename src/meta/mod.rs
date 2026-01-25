@@ -163,7 +163,11 @@ pub fn load_meta(meta_file_path: &str) -> DBSettings {
 
                     let latest_index = {
                         let last_file_index: u64 = last_file_name.parse().unwrap();
-                        (db_settings.compartment_rows as u64 * last_file_index) + file_contents.len() as u64 - 1
+                        if file_contents.len() > 0 { // avoid underflow
+                            (db_settings.compartment_rows as u64 * last_file_index) + file_contents.len() as u64 - 1
+                        } else {
+                            0
+                        }
                     };
 
                     table.1.biggest_id = latest_index;

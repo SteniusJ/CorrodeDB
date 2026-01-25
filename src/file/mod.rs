@@ -87,7 +87,7 @@ impl FileSystem {
 
         match self.read_from_cache(file_name) {
             Ok(file_contents) => {
-                if file_contents.len() >= line {
+                if file_contents.len() > line {
                     let line_string = file_contents[line].clone();
                     return Ok(line_string);
                 }

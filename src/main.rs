@@ -67,7 +67,36 @@ fn read_from_db(db_settings: &meta::DBSettings, file_system: &mut file::FileSyst
                     }
                 }
             },
-            query::IndexType::Wildcard => (),
+            query::IndexType::Wildcard => {
+                let dir_name = format!("./tables/{}", query.table_name);
+                let dir = file_system.read_folder(dir_name.as_str());
+
+                for file in dir {
+                    match file {
+                        Ok(dir_entry) => {
+                            let file_name = format!("{}/{}", dir_name, dir_entry.file_name().into_string().unwrap());
+                            match file_system.open(file_name.as_str()) {
+                                Ok(_) => println!("Success"),
+                                Err(_) => {
+                                    println!("File open failed");
+                                    continue;
+                                },
+                            }
+
+                            match file_system.read_from_cache(file_name.as_str()) {
+                                Ok(contents) => {
+                                    result.append(&mut contents.clone());
+                                },
+                                Err(_) => {
+                                    println!("Read failed");
+                                    continue;
+                                },
+                            }
+                        },
+                        Err(_) => (),
+                    }
+                }
+            },
         }
     }
 
@@ -115,9 +144,12 @@ fn write_to_db(db_settings: &mut meta::DBSettings, file_system: &mut file::FileS
             }
         },
         query::IndexType::Wildcard => {
-            let table_max_index = db_settings.tables.get(&query.table_name).unwrap().biggest_id + 1;
+            let table_max_index = if db_settings.tables.get(&query.table_name).unwrap().biggest_id > 0 {
+                db_settings.tables.get(&query.table_name).unwrap().biggest_id + 1
+            } else {
+                0
+            };
             let container = num::integer::div_floor(table_max_index, db_settings.compartment_rows as u64);
-            let line = if table_max_index < db_settings.compartment_rows as u64 {table_max_index} else {table_max_index - db_settings.compartment_rows as u64};
             let file_name = format!("./tables/{}/{}", query.table_name, container);
 
             println!("filename: {file_name}");
@@ -135,8 +167,8 @@ fn write_to_db(db_settings: &mut meta::DBSettings, file_system: &mut file::FileS
                     return http::create_http_response(400, "application/json", "\"err\":\"file read error\"");
                 }
             };
-
-            file_data.insert(line as usize, query.fn_param.clone());
+            
+            file_data.push(query.fn_param.clone());
 
             match file_system.write_to_cache(file_name.as_str(), file_data.join("\n")) {
                 Ok(s) => println!("{s:?}"),
