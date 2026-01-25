@@ -30,8 +30,8 @@ fn main() {
         }
 
         match query.fn_name.as_str() {
-            "write" => write_to_db(&db_settings, &mut file_system, &query),
-            _ => read_from_db(&db_settings, &mut file_system, &query),
+            "write" => write_to_db(&mut db_settings, &mut file_system, &query),
+            _ => read_from_db(&mut db_settings, &mut file_system, &query),
         }
     });
 
@@ -100,7 +100,7 @@ fn write_to_db(db_settings: &mut meta::DBSettings, file_system: &mut file::FileS
                 }
             };
 
-            file_data[line as usize] = query.fn_param.clone();
+            file_data.insert(line as usize, query.fn_param.clone());
 
             match file_system.write_to_cache(file_name.as_str(), file_data.join("\n")) {
                 Ok(s) => println!("{s:?}"),
@@ -118,7 +118,9 @@ fn write_to_db(db_settings: &mut meta::DBSettings, file_system: &mut file::FileS
             let table_max_index = db_settings.tables.get(&query.table_name).unwrap().biggest_id + 1;
             let container = num::integer::div_floor(table_max_index, db_settings.compartment_rows as u64);
             let line = if table_max_index < db_settings.compartment_rows as u64 {table_max_index} else {table_max_index - db_settings.compartment_rows as u64};
-            let file_name = format!("./tables{}/{}", query.table_name, container);
+            let file_name = format!("./tables/{}/{}", query.table_name, container);
+
+            println!("filename: {file_name}");
 
             match file_system.open(file_name.as_str()) {
                 Ok(status) => println!("{status:?}"),
@@ -134,7 +136,7 @@ fn write_to_db(db_settings: &mut meta::DBSettings, file_system: &mut file::FileS
                 }
             };
 
-            file_data[line as usize] = query.fn_param.clone();
+            file_data.insert(line as usize, query.fn_param.clone());
 
             match file_system.write_to_cache(file_name.as_str(), file_data.join("\n")) {
                 Ok(s) => println!("{s:?}"),

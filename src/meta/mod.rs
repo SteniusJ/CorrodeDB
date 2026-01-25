@@ -119,7 +119,7 @@ pub fn load_meta(meta_file_path: &str) -> DBSettings {
 
     let test_config_yaml = match file_system.read_from_cache(meta_file_path) {
         Ok(contents) => {
-            println!("Meta file read success");
+            println!("Meta file Read: Success");
             contents.join("\n")
         },
         Err(e) => panic!("Meta file read failed: {e:?}"),
@@ -141,11 +141,23 @@ pub fn load_meta(meta_file_path: &str) -> DBSettings {
         match file_system.create_folder(format!("./tables/{table_name}").as_str()) {
             Ok(_) => println!("created folder for table: {table_name}"),
             Err(e) => {
-                println!("folder creation for table: {table_name} failed due to error: {e}");
+                println!("folder creation for table '{table_name}' failed due to error '{e}'");
                 if e.kind() == std::io::ErrorKind::AlreadyExists {
-                    let last_file_name = file_system.read_folder(format!("./tables/{table_name}").as_str()).last().unwrap().unwrap().file_name().into_string().unwrap();
+                    let last_file_name = match file_system.read_folder(format!("./tables/{table_name}").as_str()).last() {
+                        Some(r) => {
+                            r.unwrap().file_name().into_string().unwrap() // Improved error handling maybe needed?
+                                                                          // Potentially not needed, since code is only executed on application startup.
+                                                                          // Low priority!!
+                        },
+                        None => {
+                            table.1.biggest_id = 0;
+                            println!("biggest id for table '{table_name}' is '0'\n");
+                            continue;
+                        },
 
-                    file_system.open("./tables/{table_name/{last_file_name}}").unwrap();
+                    };
+
+                    file_system.open(format!("./tables/{table_name}/{last_file_name}").as_str()).unwrap();
                     let file_contents = file_system.read_from_cache(format!("./tables/{table_name}/{last_file_name}").as_str()).unwrap();
 
 
@@ -155,11 +167,10 @@ pub fn load_meta(meta_file_path: &str) -> DBSettings {
                     };
 
                     table.1.biggest_id = latest_index;
-                    println!("biggest id for table: {table_name} is {latest_index}");
+                    println!("biggest id for table '{table_name}' is '{latest_index}'\n");
                 }
             }
         }
-        println!();
     }
 
     println!("--------- db setup finished ---------\n");
