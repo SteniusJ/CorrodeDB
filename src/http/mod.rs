@@ -16,7 +16,7 @@ pub enum HTTPRequestMethods {
 
 pub struct HTTPServer<'a> {
     endpoints: HashMap<(String, HTTPRequestMethods), Box<dyn FnMut(String, HashMap<String, String>) -> String + 'a>>,
-    middleware: Vec<Box<dyn FnMut(&mut String, &mut HashMap<String, String>) -> bool + 'a>>,
+    middleware: Vec<Box<dyn FnMut(&mut String, &mut HashMap<String, String>) -> (bool, String) + 'a>>,
     address: String,
 }
 
@@ -41,7 +41,7 @@ impl<'a> HTTPServer<'a> {
     pub fn add_endpoint(&mut self, enpoint: &str, method: HTTPRequestMethods, closure: impl FnMut(String, HashMap<String, String>) -> String + 'a) {
         self.endpoints.insert((enpoint.to_string(), method), Box::new(closure));
     }
-    pub fn add_middleware(&mut self, closure: impl FnMut(&mut String, &mut HashMap<String, String>) -> bool + 'a) {
+    pub fn add_middleware(&mut self, closure: impl FnMut(&mut String, &mut HashMap<String, String>) -> (bool, String) + 'a) {
         self.middleware.push(Box::new(closure));
     }
     pub fn listen(&mut self) {
@@ -57,20 +57,24 @@ impl<'a> HTTPServer<'a> {
 
             println!("{request_header:?}");
 
+            let mut res = String::new();
+
             for middleware in &mut self.middleware {
-                if !middleware(&mut request_header.content, &mut request_header.url_parameters) {
-                    let res = create_http_response(400, "application/json", "\"error\":\"Middleware failiure\"");
-                    stream.write_all(res.as_bytes()).unwrap();
+                let middleware_res = middleware(&mut request_header.content, &mut request_header.url_parameters);
+                if !middleware_res.0 {
+                    res = create_http_response(400, "application/json", format!("\"error\":\"{}\"", middleware_res.1).as_str());
                     break;
                 }
             }
 
-            let endpoint = match self.endpoints.get_mut(&(request_header.endpoint, request_header.method)) {
-                Some(ep) => ep(request_header.content, request_header.url_parameters),
-                None => create_http_response(404, "text/html; charset=utf-8", "Endpoint not found"),
-            };
+            if res.is_empty() {
+                res = match self.endpoints.get_mut(&(request_header.endpoint, request_header.method)) {
+                    Some(ep) => ep(request_header.content, request_header.url_parameters),
+                    None => create_http_response(404, "text/html; charset=utf-8", "Endpoint not found"),
+                };
+            }
 
-            stream.write_all(endpoint.as_bytes()).unwrap();
+            stream.write_all(res.as_bytes()).unwrap();
         }
     }
 }
@@ -97,6 +101,7 @@ fn parse_http_method(method_str: &str) -> HTTPRequestMethods {
 fn parse_http_status_code(code: u16) -> String {
     match code {
         200 => "HTTP/1.1 200 OK".to_string(),
+        400 => "HTTP/1.1 400 Bad Request".to_string(),
         404 => "HTTP/1.1 404 Not Found".to_string(),
         _ => "".to_string(),
     }
