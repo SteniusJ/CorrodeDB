@@ -3,18 +3,30 @@ mod meta;
 mod http;
 mod query;
 
+use std::env;
+
 const _TEST_FILE_PATH: &str = "./tables/test";
-const META_FILE_PATH: &str = "./meta.yaml";
+const _DEFAULT_META_FILE_PATH: &str = "./meta.yaml";
 
 fn main() {
+    // Load program arguments
+    let args: Vec<String> = env::args().collect();
+
+    let meta_file_path: &str = args[1].as_str();
+
     // Order of definition is critical,
     // variables used inside endpoints of the http_server
     // need to be defined before the server itself
     let mut file_system = file::FileSystem::new();
-    let mut db_settings = meta::load_meta(META_FILE_PATH);
+    let mut db_settings = meta::load_meta(meta_file_path);
     let mut http_server = http::HTTPServer::new("127.0.0.1:7878".to_string());
+
+    http_server.add_middleware(|_body, _url_params| {
+        println!("Execute middleware");
+        (false, "Custom middleware failure message".to_string()) // Rewrite to use std::io::Result
+    });
     
-    http_server.add_endpoint("/", http::HTTPRequestMethods::POST, |body| {
+    http_server.add_endpoint("/", http::HTTPRequestMethods::POST, |body, _url_params| {
         let query = match query::parse_query(body.as_str()) {
             Ok(query) => query,
             Err(e) => {
