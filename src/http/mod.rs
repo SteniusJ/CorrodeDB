@@ -27,6 +27,7 @@ struct HTTPRequestHeader {
     content_type: String,
     content_length: u64,
     content: String,
+    url_parameters: HashMap<String, String>,
 }
 
 impl<'a> HTTPServer<'a> {
@@ -100,6 +101,7 @@ fn parse_http_request_header(buf_reader: &mut BufReader<&mut TcpStream>) -> HTTP
         content_type: String::new(),
         content_length: 0,
         content: String::new(),
+        url_parameters: HashMap::new(),
     };
 
     loop {
@@ -121,7 +123,31 @@ fn parse_http_request_header(buf_reader: &mut BufReader<&mut TcpStream>) -> HTTP
             let line_split: Vec<&str> = buffer.split_whitespace().collect();
 
             request_header.method = parse_http_method(line_split.get(0).unwrap());
-            request_header.endpoint = line_split.get(1).unwrap().to_string();
+
+            let url_contents: Vec<&str> = line_split.get(1).unwrap().split("?").collect();
+            request_header.endpoint = url_contents[0].to_string();
+
+            if url_contents.len() > 1 {
+                let mut url_param_split = url_contents[1].split("&");
+                loop {
+                    let mut url_param_split = match url_param_split.next() {
+                        Some(v) => v,
+                        None => break,
+                    }.split("=");
+
+                    let name = match url_param_split.next() {
+                        Some(v) => v.to_string(),
+                        None => break
+                    };
+                    let value = match url_param_split.next() {
+                        Some(v) => v.to_string(),
+                        None => break
+                    };
+
+                    request_header.url_parameters.insert(name, value);
+                }
+            }
+
             continue;
         }
 
