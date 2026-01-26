@@ -15,8 +15,8 @@ pub enum HTTPRequestMethods {
 }
 
 pub struct HTTPServer<'a> {
-    endpoints: HashMap<(String, HTTPRequestMethods), Box<dyn FnMut(String) -> String + 'a>>,
-    middleware: Vec<Box<dyn FnMut() + 'a>>,
+    endpoints: HashMap<(String, HTTPRequestMethods), Box<dyn FnMut(String, HashMap<String, String>) -> String + 'a>>,
+    middleware: Vec<Box<dyn FnMut(&mut String, &mut HashMap<String, String>) -> bool + 'a>>,
     address: String,
 }
 
@@ -38,11 +38,11 @@ impl<'a> HTTPServer<'a> {
             address: address,
         }
     }
-    pub fn add_endpoint(&mut self, enpoint: &str, method: HTTPRequestMethods, closure: impl FnMut(String) -> String + 'a) {
+    pub fn add_endpoint(&mut self, enpoint: &str, method: HTTPRequestMethods, closure: impl FnMut(String, HashMap<String, String>) -> String + 'a) {
         self.endpoints.insert((enpoint.to_string(), method), Box::new(closure));
     }
-    pub fn add_middleware() {
-
+    pub fn add_middleware(&mut self, closure: impl FnMut(&mut String, &mut HashMap<String, String>) -> bool + 'a) {
+        self.middleware.push(Box::new(closure));
     }
     pub fn listen(&mut self) {
         let listener = create_tcp_listener(self.address.as_str());
@@ -53,12 +53,20 @@ impl<'a> HTTPServer<'a> {
             let mut stream = stream.unwrap();
             let mut buf_reader = BufReader::new(&mut stream);
 
-            let request_header = parse_http_request_header(&mut buf_reader);
+            let mut request_header = parse_http_request_header(&mut buf_reader);
 
             println!("{request_header:?}");
 
+            for middleware in &mut self.middleware {
+                if !middleware(&mut request_header.content, &mut request_header.url_parameters) {
+                    let res = create_http_response(400, "application/json", "\"error\":\"Middleware failiure\"");
+                    stream.write_all(res.as_bytes()).unwrap();
+                    break;
+                }
+            }
+
             let endpoint = match self.endpoints.get_mut(&(request_header.endpoint, request_header.method)) {
-                Some(ep) => ep(request_header.content),
+                Some(ep) => ep(request_header.content, request_header.url_parameters),
                 None => create_http_response(404, "text/html; charset=utf-8", "Endpoint not found"),
             };
 
