@@ -16,6 +16,7 @@ pub enum HTTPRequestMethods {
 
 pub struct HTTPServer<'a> {
     endpoints: HashMap<(String, HTTPRequestMethods), Box<dyn FnMut(String) -> String + 'a>>,
+    middleware: Vec<Box<dyn FnMut() + 'a>>,
     address: String,
 }
 
@@ -32,11 +33,15 @@ impl<'a> HTTPServer<'a> {
     pub fn new(address: String) -> HTTPServer<'a> {
         HTTPServer {
             endpoints: HashMap::new(),
+            middleware: Vec::new(),
             address: address,
         }
     }
     pub fn add_endpoint(&mut self, enpoint: &str, method: HTTPRequestMethods, closure: impl FnMut(String) -> String + 'a) {
         self.endpoints.insert((enpoint.to_string(), method), Box::new(closure));
+    }
+    pub fn add_middleware() {
+
     }
     pub fn listen(&mut self) {
         let listener = create_tcp_listener(self.address.as_str());
@@ -45,9 +50,9 @@ impl<'a> HTTPServer<'a> {
 
         for stream in listener.incoming() {
             let mut stream = stream.unwrap();
-            let buf_reader = BufReader::new(&stream);
+            let mut buf_reader = BufReader::new(&mut stream);
 
-            let request_header = parse_http_request_header(buf_reader.lines().into_iter());
+            let request_header = parse_http_request_header(&mut buf_reader);
 
             println!("{request_header:?}");
 
@@ -88,7 +93,7 @@ fn parse_http_status_code(code: u16) -> String {
     }
 }
 
-fn parse_http_request_header(header_iter: std::io::Lines<BufReader<&TcpStream>>) -> HTTPRequestHeader {
+fn parse_http_request_header(buf_reader: &mut BufReader<&mut TcpStream>) -> HTTPRequestHeader {
     let mut request_header = HTTPRequestHeader {
         method: HTTPRequestMethods::NONE,
         endpoint: String::new(),
@@ -97,23 +102,23 @@ fn parse_http_request_header(header_iter: std::io::Lines<BufReader<&TcpStream>>)
         content: String::new(),
     };
 
-    let mut building_content = false;
-    let mut content_length: u64 = 0;
-    for line_result in header_iter.enumerate() {
-        let line = line_result.1.unwrap();
-        let line_split: Vec<&str> = line.split(": ").collect();
+    loop {
+        let mut buffer = String::new();
+        let bytes = buf_reader.read_line(&mut buffer).unwrap();
 
-        if building_content {
-            content_length += line.len() as u64 + 2; // adding 2 for the newline characters "\n"
-            request_header.content += format!("{}", line).as_str();
-
-            if content_length == request_header.content_length {
-                return request_header;
+        if bytes == 0 || buffer.trim().is_empty() {
+            let mut body = vec![0; request_header.content_length as usize];
+            if request_header.content_length > 0 {
+                buf_reader.read_exact(&mut body).unwrap();
             }
+            request_header.content = String::from_utf8_lossy(&body).to_string();
+            break;
         }
 
-        if line_result.0 == 0 {
-            let line_split: Vec<&str> = line.split_whitespace().collect();
+        let line_split: Vec<&str> = buffer.trim_end().split(": ").collect();
+
+        if line_split.len() == 1 {
+            let line_split: Vec<&str> = buffer.split_whitespace().collect();
 
             request_header.method = parse_http_method(line_split.get(0).unwrap());
             request_header.endpoint = line_split.get(1).unwrap().to_string();
@@ -123,7 +128,6 @@ fn parse_http_request_header(header_iter: std::io::Lines<BufReader<&TcpStream>>)
         match *line_split.get(0).unwrap() {
             "Content-Type" => request_header.content_type = line_split.get(1).unwrap().to_string(),
             "Content-Length" => request_header.content_length = line_split.get(1).unwrap().parse().unwrap(),
-            "" => building_content = true,
             _ => (),
         }
     }
