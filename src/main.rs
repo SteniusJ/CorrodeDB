@@ -24,7 +24,7 @@ fn main() {
 
     http_server.add_middleware(|_body, _url_params| {
         println!("Execute middleware");
-        (false, "Custom middleware failure message".to_string()) // Rewrite to use std::io::Result
+        (true, "Custom middleware failure message".to_string()) // Rewrite to use std::io::Result
     });
     
     http_server.add_endpoint("/", http::HTTPRequestMethods::POST, |body, _url_params| {
@@ -32,14 +32,14 @@ fn main() {
             Ok(query) => query,
             Err(e) => {
                 println!("{e}");
-                return http::create_http_response(400, "application/json", "\"err\":\"Query could not be parsed\"");
+                return http::create_http_response(400, "application/json",  json::encode(vec![("error", json::JSONValue::String("Query could not be parsed".to_string()))]).as_str());
             }
         };
 
         println!("{query:?}");
 
         if !db_settings.table_exists(&query.table_name) {
-            return http::create_http_response(400, "application/json", "\"err\":\"Given table does not exist\"");
+            return http::create_http_response(400, "application/json", json::encode(vec![("error", json::JSONValue::String("Given table does not exist".to_string()))]).as_str());
         }
 
         match query.fn_name.as_str() {
@@ -114,12 +114,18 @@ fn read_from_db(db_settings: &meta::DBSettings, file_system: &mut file::FileSyst
     }
 
     file_system.drop_entire_cache();
-    http::create_http_response(200, "application/json", result.join("\n").as_str())
+    http::create_http_response(200, "application/json", encode_db_return(result).as_str())
+}
+
+fn encode_db_return(vec: Vec<String>) -> String {
+    let json_array: Vec<json::JSONValue> = vec.iter().map(|v| json::JSONValue::String(v.clone())).collect();
+
+    json::encode(vec![("data", json::JSONValue::Array(json_array))])
 }
 
 fn write_to_db(db_settings: &mut meta::DBSettings, file_system: &mut file::FileSystem, query: &query::QueryResult) -> String {
     if query.indexes.len() > 1 {
-        return http::create_http_response(400, "application/json", "\"err\":\"data can only be written to one index at a time\"");
+        return http::create_http_response(400, "application/json", json::encode(vec![("error", json::JSONValue::String("Data can only be written to one index at a time".to_string()))]).as_str());
     }
 
     match &query.indexes[0] {
@@ -131,14 +137,14 @@ fn write_to_db(db_settings: &mut meta::DBSettings, file_system: &mut file::FileS
             match file_system.open(file_name.as_str()) {
                 Ok(status) => println!("{status:?}"),
                 Err(_) => {
-                    return http::create_http_response(400, "application/json", "\"err\":\"file open error\"");
+                    return http::create_http_response(400, "application/json", json::encode(vec![("error", json::JSONValue::String("File open error".to_string()))]).as_str());
                 }
             }
 
             let mut file_data = match file_system.read_from_cache(file_name.as_str()) {
                 Ok(f) => f,
                 Err(_) => {
-                    return http::create_http_response(400, "application/json", "\"err\":\"file read error\"");
+                    return http::create_http_response(400, "application/json", json::encode(vec![("error", json::JSONValue::String("File read error".to_string()))]).as_str());
                 }
             };
 
@@ -147,13 +153,13 @@ fn write_to_db(db_settings: &mut meta::DBSettings, file_system: &mut file::FileS
             match file_system.write_to_cache(file_name.as_str(), file_data.join("\n")) {
                 Ok(s) => println!("{s:?}"),
                 Err(_) => {
-                    return http::create_http_response(400, "application/json", "\"err\":\"cache write error\"");
+                    return http::create_http_response(400, "application/json", json::encode(vec![("error", json::JSONValue::String("Cache write error".to_string()))]).as_str());
                 }
             }
     
             match file_system.write_entire_cache_to_disk() {
-                Ok(_) => return http::create_http_response(200, "application/json", "\"status\":\"write success\""),
-                Err(_) => return http::create_http_response(400, "application/json", "\"err\":\"write failed\""), 
+                Ok(_) => return http::create_http_response(200, "application/json", json::encode(vec![("error", json::JSONValue::String("Write success".to_string()))]).as_str()),
+                Err(_) => return http::create_http_response(400, "application/json", json::encode(vec![("error", json::JSONValue::String("Write failed".to_string()))]).as_str()), 
             }
         },
         query::IndexType::Wildcard => {
@@ -170,14 +176,14 @@ fn write_to_db(db_settings: &mut meta::DBSettings, file_system: &mut file::FileS
             match file_system.open(file_name.as_str()) {
                 Ok(status) => println!("{status:?}"),
                 Err(_) => {
-                    return http::create_http_response(400, "application/json", "\"err\":\"file open error\"");
+                    return http::create_http_response(400, "application/json", json::encode(vec![("error", json::JSONValue::String("File open error".to_string()))]).as_str());
                 }
             }
 
             let mut file_data = match file_system.read_from_cache(file_name.as_str()) {
                 Ok(f) => f,
                 Err(_) => {
-                    return http::create_http_response(400, "application/json", "\"err\":\"file read error\"");
+                    return http::create_http_response(400, "application/json", json::encode(vec![("error", json::JSONValue::String("File read error".to_string()))]).as_str());
                 }
             };
             
@@ -186,16 +192,16 @@ fn write_to_db(db_settings: &mut meta::DBSettings, file_system: &mut file::FileS
             match file_system.write_to_cache(file_name.as_str(), file_data.join("\n")) {
                 Ok(s) => println!("{s:?}"),
                 Err(_) => {
-                    return http::create_http_response(400, "application/json", "\"err\":\"cache write error\"");
+                    return http::create_http_response(400, "application/json", json::encode(vec![("error", json::JSONValue::String("Cache write error".to_string()))]).as_str());
                 }
             }
     
             match file_system.write_entire_cache_to_disk() {
                 Ok(_) => {
                     db_settings.iterate_id(&query.table_name);
-                    return http::create_http_response(200, "application/json", format!("\"status\":\"write success new id {table_max_index}\"").as_str());
-                }
-                Err(_) => return http::create_http_response(400, "application/json", "\"err\":\"write failed\""), 
+                    return http::create_http_response(200, "application/json", json::encode(vec![("error", json::JSONValue::String(format!("Write success, new id {table_max_index}")))]).as_str());
+                },
+                Err(_) => return http::create_http_response(400, "application/json", json::encode(vec![("error", json::JSONValue::String("Write failed".to_string()))]).as_str()), 
             }
         },
     }
