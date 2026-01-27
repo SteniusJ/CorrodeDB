@@ -2,6 +2,7 @@ mod file;
 mod meta;
 mod http;
 mod query;
+mod json;
 
 use std::env;
 
