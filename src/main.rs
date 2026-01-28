@@ -114,13 +114,25 @@ fn read_from_db(db_settings: &meta::DBSettings, file_system: &mut file::FileSyst
     }
 
     file_system.drop_entire_cache();
-    http::create_http_response(200, "application/json", encode_db_return(result).as_str())
+    http::create_http_response(200, "application/json", encode_db_return(result, &db_settings, &query).as_str())
 }
 
-fn encode_db_return(vec: Vec<String>) -> String {
-    let json_array: Vec<json::JSONValue> = vec.iter().map(|v| json::JSONValue::String(v.clone())).collect();
+fn encode_db_return(vec: Vec<String>, db_settings: &meta::DBSettings, query: &query::QueryResult) -> String {
+    let db_cols = &db_settings.tables.get(query.table_name.as_str()).unwrap().columns;
+    let mut json_object: Vec<(String, json::JSONValue)> = Vec::new(); // array of objects not one
+                                                                      // object with multiple
+                                                                      // references to the same
+                                                                      // keys!!!!
 
-    json::encode(vec![("data", json::JSONValue::Array(json_array))])
+    for data_row in vec {
+        for data in data_row.split(',').enumerate() {
+            let col_data = &db_cols[data.0];
+
+            json_object.push((col_data.name.clone(), json::JSONValue::String(data.1.to_string())));
+        }
+    }
+
+    json::encode(vec![("data", json::JSONValue::Object(json_object))])
 }
 
 fn write_to_db(db_settings: &mut meta::DBSettings, file_system: &mut file::FileSystem, query: &query::QueryResult) -> String {
