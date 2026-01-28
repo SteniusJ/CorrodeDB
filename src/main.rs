@@ -127,7 +127,7 @@ fn encode_db_return(vec: Vec<String>, db_settings: &meta::DBSettings, query: &qu
         for data in data_row.split(',').enumerate() {
             let col_data = &db_cols[data.0];
 
-            json_object.push((col_data.name.clone(), json::JSONValue::String(data.1.to_string())));
+            json_object.push((col_data.name.clone(), json::JSONValue::String(data.1.to_string()))); // Saves all data as String, add match for all other data types!!!
         }
         json_array.push(json::JSONValue::Object(json_object));
     }
