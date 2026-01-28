@@ -119,20 +119,20 @@ fn read_from_db(db_settings: &meta::DBSettings, file_system: &mut file::FileSyst
 
 fn encode_db_return(vec: Vec<String>, db_settings: &meta::DBSettings, query: &query::QueryResult) -> String {
     let db_cols = &db_settings.tables.get(query.table_name.as_str()).unwrap().columns;
-    let mut json_object: Vec<(String, json::JSONValue)> = Vec::new(); // array of objects not one
-                                                                      // object with multiple
-                                                                      // references to the same
-                                                                      // keys!!!!
+    let mut json_array: Vec<json::JSONValue> = Vec::new();
 
     for data_row in vec {
+        let mut json_object: Vec<(String, json::JSONValue)> = Vec::new();
+
         for data in data_row.split(',').enumerate() {
             let col_data = &db_cols[data.0];
 
             json_object.push((col_data.name.clone(), json::JSONValue::String(data.1.to_string())));
         }
+        json_array.push(json::JSONValue::Object(json_object));
     }
 
-    json::encode(vec![("data", json::JSONValue::Object(json_object))])
+    json::encode(vec![("data", json::JSONValue::Array(json_array))])
 }
 
 fn write_to_db(db_settings: &mut meta::DBSettings, file_system: &mut file::FileSystem, query: &query::QueryResult) -> String {

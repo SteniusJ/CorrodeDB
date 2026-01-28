@@ -32,7 +32,7 @@ impl fmt::Display for JSONValue {
             JSONValue::Object(v) => {
                 let mut ret = String::from("{");
                 for val in v {
-                    ret.push_str(format!("{}:{},", val.0, val.1).as_str());
+                    ret.push_str(format!("\"{}\":{},", val.0, val.1).as_str());
                 }
                 ret.pop();
                 ret.push('}');
