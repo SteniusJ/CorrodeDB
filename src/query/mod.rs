@@ -16,7 +16,7 @@ pub struct QueryResult {
 }
 
 pub fn parse_query(query_str: &str) -> Result<QueryResult> {
-    let re = Regex::new(r"(?<table_name>[[:alnum:]]*)\[(?<index>[[:digit:],*]*)\].?(?<function_name>[[:alnum:]]*)\(?(?<function_params>[[:alnum:] ,'`]*)\)?").unwrap(); // <- proper error handling needed
+    let re = Regex::new(r"(?<table_name>[[:alnum:]]*)\[(?<index>[[:digit:],*]*)\] ?(?<function_name>[[:alnum:]]*) ?(?<function_params>[[:ascii:]]*)\)?").unwrap(); // <- proper error handling needed
 
     let Some(captures) = re.captures(query_str) else {
         return Err(std::io::Error::new(std::io::ErrorKind::NotFound, "No captures found"));

@@ -3,6 +3,7 @@ mod meta;
 mod http;
 mod query;
 mod json;
+mod util;
 
 use std::env;
 
@@ -124,10 +125,20 @@ fn encode_db_return(vec: Vec<String>, db_settings: &meta::DBSettings, query: &qu
     for data_row in vec {
         let mut json_object: Vec<(String, json::JSONValue)> = Vec::new();
 
-        for data in data_row.split(',').enumerate() {
+        for data in util::escape_split(data_row.as_str(), ',').iter().enumerate() {
             let col_data = &db_cols[data.0];
 
-            json_object.push((col_data.name.clone(), json::JSONValue::String(data.1.to_string()))); // Saves all data as String, add match for all other data types!!!
+            match col_data.value {
+                meta::ColValue::NumberI => {
+                    json_object.push((col_data.name.clone(), json::JSONValue::NumI(data.1.parse().unwrap())));
+                },
+                meta::ColValue::NumberDec => {
+                    json_object.push((col_data.name.clone(), json::JSONValue::NumDec(data.1.parse().unwrap())));
+                },
+                meta::ColValue::VarChar => {
+                    json_object.push((col_data.name.clone(), json::JSONValue::String(data.1.to_string())));
+                },
+            }
         }
         json_array.push(json::JSONValue::Object(json_object));
     }
@@ -138,6 +149,31 @@ fn encode_db_return(vec: Vec<String>, db_settings: &meta::DBSettings, query: &qu
 fn write_to_db(db_settings: &mut meta::DBSettings, file_system: &mut file::FileSystem, query: &query::QueryResult) -> String {
     if query.indexes.len() > 1 {
         return http::create_http_response(400, "application/json", json::encode(vec![("error", json::JSONValue::String("Data can only be written to one index at a time".to_string()))]).as_str());
+    }
+
+    let row_data_split = util::escape_split(query.fn_param.as_str(), ',');
+    let columns = &db_settings.tables.get(&query.table_name).unwrap().columns;
+
+    if row_data_split.len() != columns.len() {
+        return http::create_http_response(400, "application/json", json::encode(vec![("error", json::JSONValue::String("The number of arguments does not match the number of data columns in the database".to_string()))]).as_str());
+    }
+
+    for row_data in row_data_split.iter().enumerate() {
+        let col_data = &columns[row_data.0];
+
+        match col_data.value {
+            meta::ColValue::NumberI => {
+                if !row_data.1.parse::<i64>().is_ok() {
+                    return http::create_http_response(400, "application/json", json::encode(vec![("error", json::JSONValue::String("Data type does not match column data type".to_string()))]).as_str()); // More descriptive error. Include index and correct data type
+                }
+            },
+            meta::ColValue::NumberDec => {
+                if !row_data.1.parse::<f64>().is_ok() {
+                    return http::create_http_response(400, "application/json", json::encode(vec![("error", json::JSONValue::String("Data type does not match column data type".to_string()))]).as_str());  // More descriptive error. Include index and correct data type
+                }
+            },
+            _ => (),
+        }
     }
 
     match &query.indexes[0] {

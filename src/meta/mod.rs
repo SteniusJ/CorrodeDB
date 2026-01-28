@@ -3,7 +3,8 @@ use std::collections::HashMap;
 
 #[derive(Clone, Debug)]
 pub enum ColValue {
-    Number,
+    NumberI,
+    NumberDec,
     VarChar
 }
 
@@ -65,7 +66,8 @@ impl DBSettings {
                     match col_data.1.0.as_str().unwrap() {
                         "value" => {
                             col_settings.value = match col_data.1.1.as_str().unwrap() {
-                                "Number" => ColValue::Number,
+                                "NumberI" => ColValue::NumberI,
+                                "NumberDec" => ColValue::NumberDec,
                                 "VarChar" => ColValue::VarChar,
                                 _ => ColValue::VarChar,
                             }
