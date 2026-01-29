@@ -21,11 +21,19 @@ fn main() {
     // need to be defined before the server itself
     let mut file_system = file::FileSystem::new();
     let mut db_settings = meta::load_meta(meta_file_path);
+    let db_password = db_settings.password.clone();
     let mut http_server = http::HTTPServer::new("127.0.0.1:7878".to_string());
 
-    http_server.add_middleware(|_body, _url_params| {
-        println!("Execute middleware");
-        (true, "Custom middleware failure message".to_string()) // Rewrite to use std::io::Result
+    http_server.add_middleware(|_body, url_params| {
+        if !url_params.contains_key("password") {
+            return (false, "Password url parameter required".to_string());
+        }
+        
+        if url_params.get("password").unwrap() == &db_password {
+            println!("password: {}, matches given_password: {}", url_params.get("password").unwrap(), db_password);
+            return (true, "Success".to_string());
+        }
+        (false, "Given password is incorrect".to_string()) // Rewrite to use std::io::Result
     });
     
     http_server.add_endpoint("/", http::HTTPRequestMethods::POST, |body, _url_params| {
