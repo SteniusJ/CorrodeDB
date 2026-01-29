@@ -28,12 +28,12 @@ fn main() {
         if !url_params.contains_key("password") {
             return (false, "Password url parameter required".to_string());
         }
-        
+ 
         if url_params.get("password").unwrap() == &db_password {
             println!("password: {}, matches given_password: {}", url_params.get("password").unwrap(), db_password);
-            return (true, "Success".to_string());
+            return (true, String::new());
         }
-        (false, "Given password is incorrect".to_string()) // Rewrite to use std::io::Result
+        (false, "Given password is incorrect".to_string())
     });
     
     http_server.add_endpoint("/", http::HTTPRequestMethods::POST, |body, _url_params| {
