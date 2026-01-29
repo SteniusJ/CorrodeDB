@@ -25,7 +25,9 @@ impl fmt::Display for JSONValue {
                 for val in v {
                     ret.push_str(format!("{},", val).as_str());
                 }
-                ret.pop();
+                if ret.len() > 1 {
+                    ret.pop();
+                }
                 ret.push(']');
                 write!(f, "{}", ret)
             },
@@ -34,7 +36,9 @@ impl fmt::Display for JSONValue {
                 for val in v {
                     ret.push_str(format!("\"{}\":{},", val.0, val.1).as_str());
                 }
-                ret.pop();
+                if ret.len() > 1 {
+                    ret.pop();
+                }
                 ret.push('}');
                 write!(f, "{}", ret)
             }
