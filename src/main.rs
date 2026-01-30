@@ -185,7 +185,7 @@ fn encode_db_return(vec: Vec<String>, db_settings: &meta::DBSettings, query: &qu
                     json_object.push((col_data.name.clone(), json::JSONValue::NumDec(data.1.parse().unwrap())));
                 },
                 meta::ColValue::VarChar => {
-                    json_object.push((col_data.name.clone(), json::JSONValue::String(data.1.to_string())));
+                    json_object.push((col_data.name.clone(), json::JSONValue::String(util::remove_escape_characters(data.1.to_string()))));
                 },
             }
         }

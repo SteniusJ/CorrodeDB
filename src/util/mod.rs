@@ -23,3 +23,7 @@ pub fn escape_split(input: &str, split_char: char) -> Vec<&str> {
     splits.push(input.get(last_split_i..input.len()).unwrap());
     splits
 }
+
+pub fn remove_escape_characters(input: String) -> String {
+    input.replace("\\", "")
+}
