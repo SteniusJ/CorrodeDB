@@ -6,12 +6,13 @@ mod json;
 mod util;
 
 use std::env;
+use rand::prelude::*;
 
 const _TEST_FILE_PATH: &str = "./tables/test";
 const _DEFAULT_META_FILE_PATH: &str = "./meta.yaml";
 
 fn main() {
-    // Load program arguments
+    // Read program arguments
     let args: Vec<String> = env::args().collect();
 
     let meta_file_path: &str = args[1].as_str();
@@ -37,7 +38,7 @@ fn main() {
     });
     
     http_server.add_endpoint("/", http::HTTPRequestMethods::POST, |body, _url_params| {
-        let query = match query::parse_query(body.as_str()) {
+        let mut query = match query::parse_query(body.as_str()) {
             Ok(query) => query,
             Err(e) => {
                 println!("{e}");
@@ -53,11 +54,51 @@ fn main() {
 
         match query.fn_name.as_str() {
             "write" => write_to_db(&mut db_settings, &mut file_system, &query),
-            _ => read_from_db(&mut db_settings, &mut file_system, &query),
+            "random" => random_from_db(&mut db_settings, &mut file_system, &mut query),
+            "" => read_from_db(&mut db_settings, &mut file_system, &query),
+            _ => http::create_http_response(400, "application/json", json::encode(vec![("error", json::JSONValue::String("Given function does not exist".to_string()))]).as_str()),
         }
     });
 
     http_server.listen();
+}
+
+fn random_from_db(db_settings: &mut meta::DBSettings, file_system: &mut file::FileSystem, query: &mut query::QueryResult) -> String {
+    let mut rng = rand::rng();
+    let nr_of_random_values: u64 = match &query.fn_param.parse::<u64>() {
+        Ok(v) => *v,
+        Err(_) => return http::create_http_response(400, "application/json", json::encode(vec![("error", json::JSONValue::String("Incorrect parameter type for random function".to_string()))]).as_str()),
+
+    };
+    let biggest_id = db_settings.tables.get(&query.table_name).unwrap().biggest_id;
+
+    match &query.indexes[0] {
+        query::IndexType::Index(_) => {
+            if query.indexes.len() < nr_of_random_values as usize {
+                return http::create_http_response(400, "application/json", json::encode(vec![("error", json::JSONValue::String("Attempting to retrieve more random values than the given query includes".to_string()))]).as_str())
+            }
+
+            let mut indexes: Vec<u64> = (0..=query.indexes.len() as u64).collect();
+            indexes.shuffle(&mut rng);
+            indexes.truncate(nr_of_random_values as usize);
+
+            query.indexes = indexes.iter().map(|i| query::IndexType::Index(*i)).collect();
+        },
+        query::IndexType::Wildcard => {
+            if biggest_id + 1 < nr_of_random_values {
+                return http::create_http_response(400, "application/json", json::encode(vec![("error", json::JSONValue::String("Attempting to retrieve more random values than the table includes".to_string()))]).as_str())
+            }
+
+            let mut indexes: Vec<u64> = (0..=biggest_id).collect();
+            indexes.shuffle(&mut rng);
+            indexes.truncate(nr_of_random_values as usize);
+
+            query.indexes = indexes.iter().map(|i| query::IndexType::Index(*i)).collect();
+        }
+    }
+
+    file_system.drop_entire_cache();
+    read_from_db(db_settings, file_system, query)
 }
 
 fn read_from_db(db_settings: &meta::DBSettings, file_system: &mut file::FileSystem, query: &query::QueryResult) -> String {
