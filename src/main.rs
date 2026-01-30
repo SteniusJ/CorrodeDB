@@ -55,12 +55,63 @@ fn main() {
         match query.fn_name.as_str() {
             "write" => write_to_db(&mut db_settings, &mut file_system, &query),
             "random" => random_from_db(&mut db_settings, &mut file_system, &mut query),
+            "remove" => remove_from_db(&mut db_settings, &mut file_system, &query),
             "" => read_from_db(&mut db_settings, &mut file_system, &query),
             _ => http::create_http_response(400, "application/json", json::encode(vec![("error", json::JSONValue::String("Given function does not exist".to_string()))]).as_str()),
         }
     });
 
     http_server.listen();
+}
+
+fn remove_from_db(db_settings: &mut meta::DBSettings, file_system: &mut file::FileSystem, query: &query::QueryResult) -> String {
+    if query.indexes.len() > 1 {
+        return http::create_http_response(400, "application/json", json::encode(vec![("error", json::JSONValue::String("Data can only be removed from one index at a time".to_string()))]).as_str());
+    }
+
+    let query::IndexType::Index(i) = query.indexes[0] else {
+        return http::create_http_response(400, "application/json", json::encode(vec![("error", json::JSONValue::String("Index type is incorrect".to_string()))]).as_str());
+    };
+    let container = num::integer::div_floor(i, db_settings.compartment_rows as u64);
+    let line = if i < db_settings.compartment_rows as u64 {i} else {i - db_settings.compartment_rows as u64};
+    let file_name = format!("./tables/{}/{}", query.table_name, container);
+    let index = {
+        if line > 0 && container > 0{
+            line * container
+        } else if container == 0 {
+            line
+        } else {
+            container * db_settings.compartment_rows as u64
+        }
+    };
+
+    match file_system.open(file_name.as_str()) {
+        Ok(status) => println!("{status:?}"),
+        Err(_) => {
+            return http::create_http_response(400, "application/json", json::encode(vec![("error", json::JSONValue::String("File open error".to_string()))]).as_str());
+        }
+    }
+
+    let mut file_data = match file_system.read_from_cache(file_name.as_str()) {
+        Ok(f) => f,
+        Err(_) => {
+            return http::create_http_response(400, "application/json", json::encode(vec![("error", json::JSONValue::String("File read error".to_string()))]).as_str());
+        }
+    };
+
+    file_data.insert(line as usize, String::new()); // Overwrite current value with empty String
+
+    match file_system.write_to_cache(file_name.as_str(), file_data.join("\n")) {
+        Ok(s) => println!("{s:?}"),
+        Err(_) => {
+            return http::create_http_response(400, "application/json", json::encode(vec![("error", json::JSONValue::String("Cache write error".to_string()))]).as_str());
+        }
+    }
+
+    match file_system.write_entire_cache_to_disk() {
+        Ok(_) => return http::create_http_response(200, "application/json", json::encode(vec![("error", json::JSONValue::String(format!("Item at index {index} has been removed")))]).as_str()),
+        Err(_) => return http::create_http_response(400, "application/json", json::encode(vec![("error", json::JSONValue::String("Removal of Item failed due to a write error".to_string()))]).as_str()), 
+    }
 }
 
 fn random_from_db(db_settings: &mut meta::DBSettings, file_system: &mut file::FileSystem, query: &mut query::QueryResult) -> String {
@@ -91,9 +142,54 @@ fn random_from_db(db_settings: &mut meta::DBSettings, file_system: &mut file::Fi
 
             let mut indexes: Vec<u64> = (0..=biggest_id).collect();
             indexes.shuffle(&mut rng);
-            indexes.truncate(nr_of_random_values as usize);
 
-            query.indexes = indexes.iter().map(|i| query::IndexType::Index(*i)).collect();
+            let mut result: Vec<(u64, String)> = Vec::new();
+
+            for i in indexes {
+                let container = num::integer::div_floor(i, db_settings.compartment_rows as u64);
+                let line = if i < db_settings.compartment_rows as u64 {i} else {i - db_settings.compartment_rows as u64};
+                let file_name = format!("./tables/{}/{}", query.table_name, container);
+
+                if !file_system.is_in_cache(file_name.as_str()) {
+                    match file_system.open(file_name.as_str()) {
+                        Ok(status) => println!("{status:?}"),
+                        Err(e) => {
+                            println!("{e}");
+                            continue; //todo proper error handling here and rollback for changes incase
+                                      //of failiure
+                        }
+                    }
+                }
+
+                match file_system.read_line_from_cache(file_name.as_str(), line as usize) {
+                    Ok(content) => {
+                        if content.is_empty() {
+                            continue;
+                        }
+
+                        let index = {
+                            if line > 0 && container > 0{
+                                line * container
+                            } else if container == 0 {
+                                line
+                            } else {
+                                container * db_settings.compartment_rows as u64
+                            }
+                        };
+                        result.push((index, content));
+
+                        if result.len() >= nr_of_random_values as usize {
+                            file_system.drop_entire_cache();
+                            return http::create_http_response(200, "application/json", encode_db_return(result, &db_settings, &query).as_str());
+                        }
+                    },
+                    Err(e) => {
+                        println!("{e}");
+                        return http::create_http_response(200, "application/json", json::encode(vec![("error", json::JSONValue::String("Index out of table range".to_string()))]).as_str());
+                    }
+                }
+            }
+            return http::create_http_response(200, "application/json", json::encode(vec![("error", json::JSONValue::String("Attempting to retrieve more values that the table includes".to_string()))]).as_str());
         }
     }
 
@@ -195,6 +291,10 @@ fn encode_db_return(vec: Vec<(u64, String)>, db_settings: &meta::DBSettings, que
     let mut json_array: Vec<json::JSONValue> = Vec::new();
 
     for data_row in vec {
+        if data_row.1.is_empty() {
+            continue;
+        }
+
         let mut json_object: Vec<(String, json::JSONValue)> = Vec::new();
 
         json_object.push(("index".to_string(), json::JSONValue::NumI(data_row.0 as i64)));
@@ -237,12 +337,12 @@ fn write_to_db(db_settings: &mut meta::DBSettings, file_system: &mut file::FileS
 
         match col_data.value {
             meta::ColValue::NumberI => {
-                if !row_data.1.parse::<i64>().is_ok() {
+                if row_data.1.parse::<i64>().is_err() {
                     return http::create_http_response(400, "application/json", json::encode(vec![("error", json::JSONValue::String("Data type does not match column data type".to_string()))]).as_str()); // More descriptive error. Include index and correct data type
                 }
             },
             meta::ColValue::NumberDec => {
-                if !row_data.1.parse::<f64>().is_ok() {
+                if row_data.1.parse::<f64>().is_err() {
                     return http::create_http_response(400, "application/json", json::encode(vec![("error", json::JSONValue::String("Data type does not match column data type".to_string()))]).as_str());  // More descriptive error. Include index and correct data type
                 }
             },
