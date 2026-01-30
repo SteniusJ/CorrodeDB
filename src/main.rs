@@ -102,7 +102,7 @@ fn random_from_db(db_settings: &mut meta::DBSettings, file_system: &mut file::Fi
 }
 
 fn read_from_db(db_settings: &meta::DBSettings, file_system: &mut file::FileSystem, query: &query::QueryResult) -> String {
-    let mut result: Vec<String> = Vec::new();
+    let mut result: Vec<(u64, String)> = Vec::new();
 
     for index in &query.indexes {
         match index {
@@ -123,7 +123,18 @@ fn read_from_db(db_settings: &meta::DBSettings, file_system: &mut file::FileSyst
                 }
 
                 match file_system.read_line_from_cache(file_name.as_str(), line as usize) {
-                    Ok(content) => result.push(content),
+                    Ok(content) => {
+                        let index = {
+                            if line > 0 && container > 0{
+                                line * container
+                            } else if container == 0 {
+                                line
+                            } else {
+                                container * db_settings.compartment_rows as u64
+                            }
+                        };
+                        result.push((index, content));
+                    },
                     Err(e) => {
                         println!("{e}");
                         return http::create_http_response(200, "application/json", json::encode(vec![("error", json::JSONValue::String("Index out of table range".to_string()))]).as_str());
@@ -137,7 +148,8 @@ fn read_from_db(db_settings: &meta::DBSettings, file_system: &mut file::FileSyst
                 for file in dir {
                     match file {
                         Ok(dir_entry) => {
-                            let file_name = format!("{}/{}", dir_name, dir_entry.file_name().into_string().unwrap());
+                            let container = dir_entry.file_name().into_string().unwrap().parse::<u64>().unwrap();
+                            let file_name = format!("{}/{}", dir_name, container);
                             match file_system.open(file_name.as_str()) {
                                 Ok(_) => println!("Success"),
                                 Err(_) => {
@@ -148,7 +160,18 @@ fn read_from_db(db_settings: &meta::DBSettings, file_system: &mut file::FileSyst
 
                             match file_system.read_from_cache(file_name.as_str()) {
                                 Ok(contents) => {
-                                    result.append(&mut contents.clone());
+                                    let mut contents_with_index: Vec<(u64, String)> = contents.iter().enumerate().map(|line| 
+                                        ({
+                                            if line.0 as u64 > 0 && container > 0{
+                                                line.0 as u64 * container
+                                            } else if container == 0 {
+                                                line.0 as u64
+                                            } else {
+                                                container * db_settings.compartment_rows as u64
+                                            }
+                                        }, line.1.clone())
+                                    ).collect();
+                                    result.append(&mut contents_with_index);
                                 },
                                 Err(_) => {
                                     println!("Read failed");
@@ -167,14 +190,16 @@ fn read_from_db(db_settings: &meta::DBSettings, file_system: &mut file::FileSyst
     http::create_http_response(200, "application/json", encode_db_return(result, &db_settings, &query).as_str())
 }
 
-fn encode_db_return(vec: Vec<String>, db_settings: &meta::DBSettings, query: &query::QueryResult) -> String {
+fn encode_db_return(vec: Vec<(u64, String)>, db_settings: &meta::DBSettings, query: &query::QueryResult) -> String {
     let db_cols = &db_settings.tables.get(query.table_name.as_str()).unwrap().columns;
     let mut json_array: Vec<json::JSONValue> = Vec::new();
 
     for data_row in vec {
         let mut json_object: Vec<(String, json::JSONValue)> = Vec::new();
 
-        for data in util::escape_split(data_row.as_str(), ',').iter().enumerate() {
+        json_object.push(("index".to_string(), json::JSONValue::NumI(data_row.0 as i64)));
+
+        for data in util::escape_split(data_row.1.as_str(), ',').iter().enumerate() {
             let col_data = &db_cols[data.0];
 
             match col_data.value {
