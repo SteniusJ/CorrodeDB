@@ -126,7 +126,7 @@ fn read_from_db(db_settings: &meta::DBSettings, file_system: &mut file::FileSyst
                     Ok(content) => result.push(content),
                     Err(e) => {
                         println!("{e}");
-                        continue;
+                        return http::create_http_response(200, "application/json", json::encode(vec![("error", json::JSONValue::String("Index out of table range".to_string()))]).as_str());
                     }
                 }
             },
