@@ -329,6 +329,7 @@ fn write_to_db(db_settings: &mut meta::DBSettings, file_system: &mut file::FileS
             file_data.push(query.fn_param.clone());
 
             if file_write(file_name.as_str(), file_data, file_system) {
+                db_settings.iterate_id(&query.table_name);
                 return http::create_http_response(200, "application/json", json::encode(vec![("error", json::JSONValue::String(format!("Write success"))), ("index", json::JSONValue::NumI(table_max_index as i64))]).as_str());
             } else {
                 return http::create_http_response(400, "application/json", json::encode(vec![("error", json::JSONValue::String("Write failed".to_string()))]).as_str())
