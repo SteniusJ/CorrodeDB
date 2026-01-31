@@ -10,7 +10,7 @@ tables: # all db tables come under here
   reactions: # table 2
     rows:
       id:
-        value: NumberDec # number with decimal point
+        value: NumberF # number with decimal point
       reaction:
         value: VarChar
   images: # table 3

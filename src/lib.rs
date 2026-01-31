@@ -289,7 +289,7 @@ fn write_to_db(db_settings: &mut meta::DBSettings, file_system: &mut file::FileS
                     return http::create_http_response(400, "application/json", json::encode(vec![("error", json::JSONValue::String("Data type does not match column data type".to_string()))]).as_str()); // More descriptive error. Include index and correct data type
                 }
             },
-            meta::ColValue::NumberDec => {
+            meta::ColValue::NumberF => {
                 if row_data.1.parse::<f64>().is_err() {
                     return http::create_http_response(400, "application/json", json::encode(vec![("error", json::JSONValue::String("Data type does not match column data type".to_string()))]).as_str());  // More descriptive error. Include index and correct data type
                 }
@@ -357,8 +357,8 @@ fn encode_db_return(vec: Vec<(u64, String)>, db_settings: &meta::DBSettings, que
                 meta::ColValue::NumberI => {
                     json_object.push((col_data.name.clone(), json::JSONValue::NumI(data.1.parse().unwrap())));
                 },
-                meta::ColValue::NumberDec => {
-                    json_object.push((col_data.name.clone(), json::JSONValue::NumDec(data.1.parse().unwrap())));
+                meta::ColValue::NumberF => {
+                    json_object.push((col_data.name.clone(), json::JSONValue::NumF(data.1.parse().unwrap())));
                 },
                 meta::ColValue::VarChar => {
                     json_object.push((col_data.name.clone(), json::JSONValue::String(util::remove_escape_characters(data.1.to_string()))));

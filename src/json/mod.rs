@@ -3,7 +3,7 @@ use std::fmt;
 pub enum JSONValue {
     String(String),
     NumI(i64),
-    NumDec(f64),
+    NumF(f64),
     Array(Vec<JSONValue>),
     Object(Vec<(String, JSONValue)>),
 }
@@ -17,7 +17,7 @@ impl fmt::Display for JSONValue {
             JSONValue::NumI(v) => {
                 write!(f, "{}", v)
             },
-            JSONValue::NumDec(v) => {
+            JSONValue::NumF(v) => {
                 write!(f, "{}", v)
             },
             JSONValue::Array(v) => {
