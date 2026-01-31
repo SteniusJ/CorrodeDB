@@ -11,8 +11,6 @@ pub enum ColValue {
 pub struct DBSettings {
     pub tables: HashMap<String, TableSettings>,
     pub password: String,
-    pub cache_max_size: i16,
-    pub cache_life_time: i16,
     pub compartment_rows: i16,
 }
 
@@ -26,8 +24,6 @@ pub struct TableSettings {
 pub struct ColSettings {
     pub name: String,
     pub value: ColValue,
-    pub primary_key: bool,
-    pub auto_iterate: bool,
 }
 
 impl DBSettings {
@@ -58,8 +54,6 @@ impl DBSettings {
                 let mut col_settings = ColSettings {
                     name: columns.1.0.as_str().unwrap().to_string(),
                     value: ColValue::VarChar,
-                    primary_key: false,
-                    auto_iterate: false,
                 };
 
                 for col_data in columns.1.1.as_hash().unwrap().iter().enumerate() {
@@ -72,8 +66,6 @@ impl DBSettings {
                                 _ => ColValue::VarChar,
                             }
                         }
-                        "primary_key" => col_settings.primary_key = col_data.1.1.as_bool().unwrap(),
-                        "auto_iterate" => col_settings.auto_iterate = col_data.1.1.as_bool().unwrap(),
                         _ => (),
                     }
                 }
@@ -92,8 +84,6 @@ impl DBSettings {
         DBSettings {
             tables: table_map,
             password: doc["settings"]["password"].as_str().unwrap().to_string(),
-            cache_max_size: doc["settings"]["cache"]["max_size"].as_i64().unwrap() as i16,
-            cache_life_time: doc["settings"]["cache"]["life_time"].as_i64().unwrap() as i16,
             compartment_rows: doc["settings"]["compartment"]["rows"].as_i64().unwrap() as i16,
         }
     }
