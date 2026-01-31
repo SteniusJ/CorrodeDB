@@ -1,13 +1,31 @@
 use std::env;
 use db_project::start_database;
 
-const _DEFAULT_META_FILE_PATH: &str = "./meta.yaml";
+mod util;
+
+const DEFAULT_SCHEMA_FILE_PATH: &str = "./schema.yaml";
+const DEFAULT_PORT: &str = "4067";
 
 fn main() {
     // Read program arguments
-    let args: Vec<String> = env::args().collect();
+    let args = util::parse_program_args(env::args().collect());
 
-    let meta_file_path: &str = args[1].as_str();
+    let mut schema_file_path: String = DEFAULT_SCHEMA_FILE_PATH.to_string();
+    let mut port: String = DEFAULT_PORT.to_string();
 
-    start_database(meta_file_path);
+    for (flag, value) in args {
+        match flag.as_str() {
+            "-s" => {
+                schema_file_path = value;
+            },
+            "-p" => {
+                port = value;
+            },
+            f=> {
+                panic!("flag {f} is not a valid flag");
+            },
+        }
+    }
+
+    start_database(schema_file_path.as_str(), port.as_str());
 }

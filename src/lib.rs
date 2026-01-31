@@ -8,14 +8,14 @@ mod util;
 use rand::prelude::*;
 use std::io::{Result, Error, ErrorKind};
 
-pub fn start_database(schema_path: &str) {
+pub fn start_database(schema_path: &str, port: &str) {
     // Order of definition is critical,
     // variables used inside endpoints of the http_server
     // need to be defined before the server itself
     let mut file_system = file::FileSystem::new();
     let mut db_settings = meta::load_meta(schema_path);
     let db_password = db_settings.password.clone();
-    let mut http_server = http::HTTPServer::new("127.0.0.1:7878".to_string());
+    let mut http_server = http::HTTPServer::new(format!("127.0.0.1:{port}"));
 
     http_server.add_middleware(|_body, url_params| {
         if !url_params.contains_key("password") {
