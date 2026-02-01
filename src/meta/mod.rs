@@ -1,5 +1,6 @@
 use yaml_rust2::YamlLoader;
 use std::collections::HashMap;
+use std::io::{Result, ErrorKind, Error};
 
 #[derive(Clone, Debug)]
 pub enum ColValue {
@@ -96,6 +97,23 @@ impl DBSettings {
 }
 
 impl TableSettings {
+    pub fn get_column(&self, column_name: String) -> Result<(usize, &ColSettings)> {
+        for (index, column) in self.columns.iter().enumerate() {
+            if column.name == column_name {
+                return Ok((index, column));
+            }
+        }
+        Err(Error::new(ErrorKind::Other, "column not found"))
+    }
+    pub fn has_column(&self, column_name: String) -> bool {
+        for column in &self.columns {
+            if column.name == column_name {
+                return true;
+            }
+        }
+
+        false
+    }
     fn iterate_id(&mut self) {
         self.biggest_id += 1;
     }

@@ -83,6 +83,7 @@ pub fn start_database(schema_path: &str, port: &str) {
             "write" => write_to_db(&mut db_settings, &mut file_system, &query),
             "random" => random_from_db(&mut db_settings, &mut file_system, &mut query),
             "remove" => remove_from_db(&mut db_settings, &mut file_system, &query),
+            "where" => where_from_db(&mut db_settings, &mut file_system, &query),
             "" => read_from_db(&mut db_settings, &mut file_system, &query),
             _ => http::create_http_response(400, "application/json", json::encode(vec![("error", json::JSONValue::String("Given function does not exist".to_string()))]).as_str()),
         }
@@ -137,7 +138,7 @@ fn file_write(file_name: &str, file_data: Vec<String>, file_system: &mut file::F
     }
 }
 
-fn read_line(file_name: &str, file_system: &mut file::FileSystem, mut result: Vec<(u64, String)>, line: u64, index: u64) -> Result<Vec<(u64, String)>> {
+fn read_line(file_name: &str, file_system: &mut file::FileSystem, line: u64) -> Result<String> {
     match file_system.open(file_name) {
         Ok(_) => (),
         Err(e) if e.kind() == ErrorKind::InvalidInput => (),
@@ -149,15 +150,204 @@ fn read_line(file_name: &str, file_system: &mut file::FileSystem, mut result: Ve
     match file_system.read_line_from_cache(file_name, line as usize) {
         Ok(content) => {
             if !content.is_empty() {
-                result.push((index, content));
+                return Ok(content);
             }
 
-            return Ok(result);
+            return Err(Error::new(ErrorKind::Other, "content is empty"));
         },
         Err(e) => {
             return Err(e);
         }
     }
+}
+
+fn where_from_db(db_settings: &mut meta::DBSettings, file_system: &mut file::FileSystem, query: &query::QueryResult) -> String {
+    let mut result: Vec<(u64, String)> = Vec::new();
+    let mut arguments = util::escape_split(query.fn_param.as_str(), ',').into_iter();
+
+    let column = {
+        let Some(column) = arguments.next() else {
+            return http::create_http_response(200, "application/json", json::encode(vec![("error", json::JSONValue::String("Please give a column name".to_string()))]).as_str());
+        };
+        if column.is_empty() {
+            return http::create_http_response(200, "application/json", json::encode(vec![("error", json::JSONValue::String("Please give a column name".to_string()))]).as_str());
+        }
+        if !db_settings.tables.get(&query.table_name).unwrap().has_column(column.to_string()) {
+            return http::create_http_response(200, "application/json", json::encode(vec![("error", json::JSONValue::String("Column does not exist in table".to_string()))]).as_str()); // improve error message
+        }
+        column
+    };
+    let operator = {
+        let Some(operator) = arguments.next() else {
+            return http::create_http_response(200, "application/json", json::encode(vec![("error", json::JSONValue::String("Please give a operator".to_string()))]).as_str());
+        };
+        if operator.is_empty() {
+            return http::create_http_response(200, "application/json", json::encode(vec![("error", json::JSONValue::String("Please give a operator".to_string()))]).as_str());
+        }
+        if !match operator { // not optimal, improve this!!!
+            ">" => true,
+            "<" => true,
+            "=" => true,
+            _ => false,
+        } {
+            return http::create_http_response(200, "application/json", json::encode(vec![("error", json::JSONValue::String(format!("{operator} is not a valid operator")))]).as_str());
+        }
+        operator
+    };
+    let Some(value) = arguments.next() else {
+        return http::create_http_response(200, "application/json", json::encode(vec![("error", json::JSONValue::String("Please give a comparison value".to_string()))]).as_str());
+    };
+
+    fn is_matching(column_value: &meta::ColValue, column_content: &str, match_value: &str, operator: &str) -> Result<bool> {
+        match operator {
+            ">" => {
+                match column_value {
+                    meta::ColValue::NumberI => {
+                        if let Ok(value) = match_value.parse::<i64>() {
+                            if column_content.parse::<i64>().unwrap() > value {
+                                return Ok(true);
+                            }
+                        }
+                        return Ok(false);
+                    },
+                    meta::ColValue::NumberF => {
+                        if let Ok(value) = match_value.parse::<f64>() {
+                            if column_content.parse::<f64>().unwrap() > value {
+                                return Ok(true);
+                            }
+                        }
+                        return Ok(false);
+                    },
+                    meta::ColValue::VarChar => return Err(Error::new(ErrorKind::Other, "cannot use > operator on VarChar")),
+                }
+            },
+            "<" => {
+                match column_value {
+                    meta::ColValue::NumberI => {
+                        if let Ok(value) = match_value.parse::<i64>() {
+                            if column_content.parse::<i64>().unwrap() < value {
+                                return Ok(true);
+                            }
+                        }
+                        return Ok(false);
+                    },
+                    meta::ColValue::NumberF => {
+                        if let Ok(value) = match_value.parse::<f64>() {
+                            if column_content.parse::<f64>().unwrap() < value {
+                                return Ok(true);
+                            }
+                        }
+                        return Ok(false);
+                    },
+                    meta::ColValue::VarChar => return Err(Error::new(ErrorKind::Other, "cannot use < operator on VarChar")),
+                }
+            },
+            "=" => {
+                if column_content == match_value {
+                    return Ok(true);
+                }
+                return Ok(false);
+            },
+            _ => return Ok(false),
+        }
+    }
+
+    for index in &query.indexes {
+        match index {
+            query::IndexType::Index(i) => {
+                let (line, file_name, index) = get_line_fname_idx(db_settings, query, *i);
+                let (column_index, column) = db_settings.tables.get(&query.table_name).unwrap().get_column(column.to_string()).unwrap();
+
+                match read_line(file_name.as_str(), file_system,  line) {
+                    Ok(content) => {
+                            if content.is_empty() {
+                                continue;
+                            }
+
+                            let column_content = util::escape_split(content.as_str(), ',')[column_index];
+
+                            match is_matching(&column.value, column_content, value, operator) {
+                                Ok(b) => {
+                                    if b {
+                                        result.push((index, content));
+                                    }
+                                },
+                                Err(e) => {
+                                    return http::create_http_response(400, "application/json", json::encode(vec![("error", json::JSONValue::String(format!("{e}")))]).as_str())
+                                },
+                            }
+                    },
+                    Err(e) if e.kind() == ErrorKind::Other => (),
+                    Err(_) => {
+                        return http::create_http_response(200, "application/json", json::encode(vec![("error", json::JSONValue::String("Index out of table range".to_string()))]).as_str());
+                    }
+                };
+            },
+            query::IndexType::Wildcard => {
+                let dir_name = format!("./tables/{}", query.table_name);
+                let dir = file_system.read_folder(dir_name.as_str());
+                let (column_index, column) = db_settings.tables.get(&query.table_name).unwrap().get_column(column.to_string()).unwrap();
+
+                for file in dir {
+                    match file {
+                        Ok(dir_entry) => {
+                            let container = dir_entry.file_name().into_string().unwrap().parse::<u64>().unwrap();
+                            let file_name = format!("{}/{}", dir_name, container);
+                            match file_system.open(file_name.as_str()) {
+                                Ok(_) => println!("Success"),
+                                Err(e) if e.kind() == ErrorKind::InvalidInput => (),
+                                Err(_) => {
+                                    println!("File open failed");
+                                    continue;
+                                },
+                            }
+
+                            match file_system.read_from_cache(file_name.as_str()) {
+                                Ok(contents) => {
+                                    for (index, content) in contents.into_iter().enumerate() {
+                                        if content.is_empty() {
+                                            continue;
+                                        }
+
+                                        let index ={
+                                            if index as u64 > 0 && container > 0{
+                                                index as u64 * container
+                                            } else if container == 0 {
+                                                index as u64
+                                            } else {
+                                                container * db_settings.compartment_rows as u64
+                                            }
+                                        };
+
+                                        let column_content = util::escape_split(content.as_str(), ',')[column_index];
+
+                                        match is_matching(&column.value, column_content, value, operator) {
+                                            Ok(b) => {
+                                                if b {
+                                                    result.push((index, content));
+                                                }
+                                            },
+                                            Err(e) => {
+                                                return http::create_http_response(400, "application/json", json::encode(vec![("error", json::JSONValue::String(format!("{e}")))]).as_str())
+                                            },
+                                        }
+                                    }
+                                },
+                                Err(_) => {
+                                    println!("Read failed");
+                                    continue;
+                                },
+                            }
+                        },
+                        Err(_) => (),
+                    }
+                }
+            },
+        }
+    }
+
+    file_system.drop_entire_cache();
+    http::create_http_response(200, "application/json", encode_db_return(result, &db_settings, &query).as_str())
 }
 
 fn remove_from_db(db_settings: &mut meta::DBSettings, file_system: &mut file::FileSystem, query: &query::QueryResult) -> String {
@@ -218,8 +408,9 @@ fn random_from_db(db_settings: &mut meta::DBSettings, file_system: &mut file::Fi
             for i in indexes {
                 let (line, file_name, index) = get_line_fname_idx(db_settings, query, i);
 
-                result = match read_line(file_name.as_str(), file_system, result, line, index) {
-                    Ok(r) => r,
+                match read_line(file_name.as_str(), file_system, line) {
+                    Ok(content) => result.push((index, content)),
+                    Err(e) if e.kind() == ErrorKind::Other => (),
                     Err(_) => {
                         return http::create_http_response(200, "application/json", json::encode(vec![("error", json::JSONValue::String("Index out of table range".to_string()))]).as_str());
                     }
@@ -247,8 +438,9 @@ fn read_from_db(db_settings: &meta::DBSettings, file_system: &mut file::FileSyst
             query::IndexType::Index(i) => {
                 let (line, file_name, index) = get_line_fname_idx(db_settings, query, *i);
 
-                result = match read_line(file_name.as_str(), file_system, result, line, index) {
-                    Ok(r) => r,
+                match read_line(file_name.as_str(), file_system, line) {
+                    Ok(content) => result.push((index, content)),
+                    Err(e) if e.kind() == ErrorKind::Other => (),
                     Err(_) => {
                         return http::create_http_response(200, "application/json", json::encode(vec![("error", json::JSONValue::String("Index out of table range".to_string()))]).as_str());
                     }
