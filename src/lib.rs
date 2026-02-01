@@ -95,6 +95,7 @@ pub fn start_database(schema_path: &str, port: &str) {
 fn file_read(file_name: &str, file_system: &mut file::FileSystem) -> Result<Vec<String>> {
     match file_system.open(file_name) {
         Ok(_) => (),
+        Err(e) if e.kind() == ErrorKind::InvalidInput => (),
         Err(e) => {
             return Err(e);
         }
@@ -457,6 +458,7 @@ fn read_from_db(db_settings: &meta::DBSettings, file_system: &mut file::FileSyst
                             let file_name = format!("{}/{}", dir_name, container);
                             match file_system.open(file_name.as_str()) {
                                 Ok(_) => println!("Success"),
+                                Err(e) if e.kind() == ErrorKind::InvalidInput => (),
                                 Err(_) => {
                                     println!("File open failed");
                                     continue;
