@@ -7,6 +7,41 @@ mod util;
 
 use rand::prelude::*;
 use std::io::{Result, Error, ErrorKind};
+use std::env;
+
+const DEFAULT_SCHEMA_FILE_PATH: &str = "./schema.yaml";
+const DEFAULT_PORT: &str = "4067";
+
+pub struct ProgramArgs {
+    pub schema_path: String,
+    pub port: String,
+}
+
+pub fn load_program_arguments() -> ProgramArgs {
+    let mut program_args = ProgramArgs {
+        schema_path: String::from(DEFAULT_SCHEMA_FILE_PATH),
+        port: String::from(DEFAULT_PORT),
+    };
+
+    // Read program arguments
+    let args = util::parse_program_args(env::args().collect());
+
+    for (flag, value) in args {
+        match flag.as_str() {
+            "-s" => {
+                program_args.schema_path = value;
+            },
+            "-p" => {
+                program_args.port = value;
+            },
+            f=> {
+                panic!("flag {f} is not a valid flag");
+            },
+        }
+    }
+
+    program_args
+}
 
 pub fn start_database(schema_path: &str, port: &str) {
     // Order of definition is critical,
