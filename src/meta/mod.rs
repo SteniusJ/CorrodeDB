@@ -102,26 +102,26 @@ impl TableSettings {
 }
 
 pub fn load_meta(meta_file_path: &str) -> DBSettings {
-    println!("loading settings yaml file from: {meta_file_path}\n");
+    println!("---------------- loading schema -------------------\nloading schema yaml file from: {meta_file_path}\n");
 
     let mut file_system = crate::file::FileSystem::new();
 
     match file_system.open(meta_file_path) {
-        Ok(status) => println!("Meta file open: {status:?}"),
-        Err(e) => panic!("Meta file open failed: {e:?}"),
+        Ok(status) => println!("Schema file open: {status:?}"),
+        Err(e) => panic!("Schema file open failed: {e:?}"),
     }
 
     let test_config_yaml = match file_system.read_from_cache(meta_file_path) {
         Ok(contents) => {
-            println!("Meta file Read: Success");
+            println!("Schema file Read: Success");
             contents.join("\n")
         },
-        Err(e) => panic!("Meta file read failed: {e:?}"),
+        Err(e) => panic!("Schema file read failed: {e:?}"),
     };
 
     match file_system.drop_from_cache(meta_file_path) {
-        Ok(status) => println!("Meta file remove from cache: {status:?}"),
-        Err(e) => println!("Meta file drop failed: {e:?}"),
+        Ok(status) => println!("Schema file remove from cache: {status:?}"),
+        Err(e) => println!("Schema file drop failed: {e:?}"),
     }
 
     let mut db_settings = DBSettings::new(test_config_yaml.as_str());
@@ -134,39 +134,37 @@ pub fn load_meta(meta_file_path: &str) -> DBSettings {
 
         match file_system.create_folder(format!("./tables/{table_name}").as_str()) {
             Ok(_) => println!("created folder for table: {table_name}"),
+            Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => {
+                let last_file_name = match file_system.read_folder(format!("./tables/{table_name}").as_str()).last() {
+                    Some(r) => {
+                        r.unwrap().file_name().into_string().unwrap() // Improved error handling maybe needed?
+                                                                      // Potentially not needed, since code is only executed on application startup.
+                                                                      // Low priority!!
+                    },
+                    None => {
+                        table.1.biggest_id = 0;
+                        println!("biggest id for table '{table_name}' is '0'\n");
+                        continue;
+                    },
+                };
+
+                file_system.open(format!("./tables/{table_name}/{last_file_name}").as_str()).unwrap();
+                let file_contents = file_system.read_from_cache(format!("./tables/{table_name}/{last_file_name}").as_str()).unwrap();
+
+                let latest_index = {
+                    let last_file_index: u64 = last_file_name.parse().unwrap();
+                    if file_contents.len() > 0 { // avoid underflow
+                        (db_settings.compartment_rows as u64 * last_file_index) + file_contents.len() as u64 - 1
+                    } else {
+                        0
+                    }
+                };
+
+                table.1.biggest_id = latest_index;
+                println!("biggest id for table '{table_name}' is '{latest_index}'\n");
+            },
             Err(e) => {
-                println!("folder creation for table '{table_name}' failed due to error '{e}'");
-                if e.kind() == std::io::ErrorKind::AlreadyExists {
-                    let last_file_name = match file_system.read_folder(format!("./tables/{table_name}").as_str()).last() {
-                        Some(r) => {
-                            r.unwrap().file_name().into_string().unwrap() // Improved error handling maybe needed?
-                                                                          // Potentially not needed, since code is only executed on application startup.
-                                                                          // Low priority!!
-                        },
-                        None => {
-                            table.1.biggest_id = 0;
-                            println!("biggest id for table '{table_name}' is '0'\n");
-                            continue;
-                        },
-
-                    };
-
-                    file_system.open(format!("./tables/{table_name}/{last_file_name}").as_str()).unwrap();
-                    let file_contents = file_system.read_from_cache(format!("./tables/{table_name}/{last_file_name}").as_str()).unwrap();
-
-
-                    let latest_index = {
-                        let last_file_index: u64 = last_file_name.parse().unwrap();
-                        if file_contents.len() > 0 { // avoid underflow
-                            (db_settings.compartment_rows as u64 * last_file_index) + file_contents.len() as u64 - 1
-                        } else {
-                            0
-                        }
-                    };
-
-                    table.1.biggest_id = latest_index;
-                    println!("biggest id for table '{table_name}' is '{latest_index}'\n");
-                }
+                panic!("folder creation for table '{table_name}' failed due to error '{e}'");
             }
         }
     }
