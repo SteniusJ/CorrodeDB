@@ -112,17 +112,13 @@ fn get_line_fname_idx(db_settings: &meta::DBSettings, query: &query::QueryResult
     let container = num::integer::div_floor(index, db_settings.compartment_rows as u64);
     let line = if index < db_settings.compartment_rows as u64 {index} else {index - db_settings.compartment_rows as u64};
     let file_name = format!("./tables/{}/{}", query.table_name, container);
-    let index = {
-        if line > 0 && container > 0{
-            line * container
-        } else if container == 0 {
-            line
-        } else {
-            container * db_settings.compartment_rows as u64
-        }
-    };
+    let index = get_index(line, container, db_settings);
 
     (line, file_name, index)
+}
+
+fn get_index(line: u64, container: u64, db_settings: &meta::DBSettings) -> u64 {
+    line + (container * db_settings.compartment_rows as u64)
 }
 
 fn file_write(file_name: &str, file_data: Vec<String>, file_system: &mut file::FileSystem) -> bool {
@@ -310,15 +306,7 @@ fn where_from_db(db_settings: &mut meta::DBSettings, file_system: &mut file::Fil
                                             continue;
                                         }
 
-                                        let index ={
-                                            if index as u64 > 0 && container > 0{
-                                                index as u64 * container
-                                            } else if container == 0 {
-                                                index as u64
-                                            } else {
-                                                container * db_settings.compartment_rows as u64
-                                            }
-                                        };
+                                        let index = get_index(index as u64, container, db_settings);
 
                                         let column_content = util::escape_split(content.as_str(), ',')[column_index];
 
@@ -467,17 +455,7 @@ fn read_from_db(db_settings: &meta::DBSettings, file_system: &mut file::FileSyst
 
                             match file_system.read_from_cache(file_name.as_str()) {
                                 Ok(contents) => {
-                                    let mut contents_with_index: Vec<(u64, String)> = contents.iter().enumerate().map(|line| 
-                                        ({
-                                            if line.0 as u64 > 0 && container > 0{
-                                                line.0 as u64 * container
-                                            } else if container == 0 {
-                                                line.0 as u64
-                                            } else {
-                                                container * db_settings.compartment_rows as u64
-                                            }
-                                        }, line.1.clone())
-                                    ).collect();
+                                    let mut contents_with_index: Vec<(u64, String)> = contents.iter().enumerate().map(|line| (get_index(line.0 as u64, container, db_settings), line.1.clone())).collect();
                                     result.append(&mut contents_with_index);
                                 },
                                 Err(_) => {
