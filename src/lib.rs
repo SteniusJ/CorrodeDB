@@ -68,12 +68,12 @@ pub fn start_database(schema_path: &str, port: &str) {
         let mut query = match query::parse_query(body.as_str()) {
             Ok(query) => query,
             Err(e) => {
-                println!("{e}");
+                println!("Query parse error: {e}");
                 return http::create_http_response(400, "application/json",  json::encode(vec![("error", json::JSONValue::String("Query could not be parsed".to_string()))]).as_str());
             }
         };
 
-        println!("{query:?}");
+        println!("{query}");
 
         if !db_settings.table_exists(&query.table_name) {
             return http::create_http_response(404, "application/json", json::encode(vec![("error", json::JSONValue::String("Given table does not exist".to_string()))]).as_str());
@@ -291,10 +291,10 @@ fn where_from_db(db_settings: &mut meta::DBSettings, file_system: &mut file::Fil
                             let container = dir_entry.file_name().into_string().unwrap().parse::<u64>().unwrap();
                             let file_name = format!("{}/{}", dir_name, container);
                             match file_system.open(file_name.as_str()) {
-                                Ok(_) => println!("Success"),
+                                Ok(_) => (),
                                 Err(e) if e.kind() == ErrorKind::InvalidInput => (),
-                                Err(_) => {
-                                    println!("File open failed");
+                                Err(e) => {
+                                    println!("File open failed: {e}");
                                     continue;
                                 },
                             }
@@ -322,8 +322,8 @@ fn where_from_db(db_settings: &mut meta::DBSettings, file_system: &mut file::Fil
                                         }
                                     }
                                 },
-                                Err(_) => {
-                                    println!("Read failed");
+                                Err(e) => {
+                                    println!("Read failed: {e}");
                                     continue;
                                 },
                             }
@@ -406,7 +406,6 @@ fn random_from_db(db_settings: &mut meta::DBSettings, file_system: &mut file::Fi
                 };
 
                 if result.len() >= nr_of_random_values as usize{
-                    println!("{result:?}");
                     file_system.drop_entire_cache();
                     return http::create_http_response(200, "application/json", encode_db_return(result, &db_settings, &query).as_str());
                 }
@@ -445,10 +444,10 @@ fn read_from_db(db_settings: &meta::DBSettings, file_system: &mut file::FileSyst
                             let container = dir_entry.file_name().into_string().unwrap().parse::<u64>().unwrap();
                             let file_name = format!("{}/{}", dir_name, container);
                             match file_system.open(file_name.as_str()) {
-                                Ok(_) => println!("Success"),
+                                Ok(_) => (),
                                 Err(e) if e.kind() == ErrorKind::InvalidInput => (),
-                                Err(_) => {
-                                    println!("File open failed");
+                                Err(e) => {
+                                    println!("File open failed: {e}");
                                     continue;
                                 },
                             }
@@ -458,8 +457,8 @@ fn read_from_db(db_settings: &meta::DBSettings, file_system: &mut file::FileSyst
                                     let mut contents_with_index: Vec<(u64, String)> = contents.iter().enumerate().map(|line| (get_index(line.0 as u64, container, db_settings), line.1.clone())).collect();
                                     result.append(&mut contents_with_index);
                                 },
-                                Err(_) => {
-                                    println!("Read failed");
+                                Err(e) => {
+                                    println!("Read failed: {e}");
                                     continue;
                                 },
                             }

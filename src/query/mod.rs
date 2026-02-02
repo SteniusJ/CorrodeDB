@@ -1,5 +1,6 @@
 use regex::Regex;
 use std::io::Result;
+use std::fmt;
 
 #[derive(Debug, PartialEq)]
 pub enum IndexType {
@@ -13,6 +14,12 @@ pub struct QueryResult {
     pub indexes: Vec<IndexType>,
     pub fn_name: String,
     pub fn_param: String,
+}
+
+impl fmt::Display for QueryResult {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "Query: {}{:?} {} {}", self.table_name, self.indexes, self.fn_name, self.fn_param)
+    }
 }
 
 pub fn parse_query(query_str: &str) -> Result<QueryResult> {
