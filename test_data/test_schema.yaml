@@ -1,0 +1,22 @@
+tables:
+  testtable1:
+    rows:
+      numi:
+        value: NumberI
+      numf:
+        value: NumberF
+      varchar:
+        value: VarChar
+  testtable2:
+    rows:
+      numi:
+        value: NumberI
+      numf:
+        value: NumberF
+      varchar:
+        value: VarChar
+
+settings:
+  compartment:
+    rows: 5
+  password: TestPassword

@@ -559,7 +559,7 @@ fn write_to_db(db_settings: &mut meta::DBSettings, file_system: &mut file::FileS
 
             if file_write(file_name.as_str(), file_data, file_system) {
                 db_settings.iterate_id(&query.table_name);
-                return http::create_http_response(200, "application/json", json::encode(vec![("error", json::JSONValue::String(format!("Write success"))), ("index", json::JSONValue::NumI(table_max_index as i64))]).as_str());
+                return http::create_http_response(200, "application/json", json::encode(vec![("status", json::JSONValue::String(format!("Write success"))), ("index", json::JSONValue::NumI(table_max_index as i64))]).as_str());
             } else {
                 return http::create_http_response(400, "application/json", json::encode(vec![("error", json::JSONValue::String("Write failed".to_string()))]).as_str())
             }
@@ -585,7 +585,7 @@ fn encode_db_return(vec: Vec<(u64, String)>, db_settings: &meta::DBSettings, que
 
             match col_data.value {
                 meta::ColValue::NumberI => {
-                    json_object.push((col_data.name.clone(), json::JSONValue::NumI(data.1.parse().unwrap())));
+                    json_object.push((col_data.name.clone(), json::JSONValue::NumI(data.1.parse().unwrap()))); // look into this! is parsing even necessary? Pretty sure the value is already validated as the correct type by this point. Just adding extra overhead?
                 },
                 meta::ColValue::NumberF => {
                     json_object.push((col_data.name.clone(), json::JSONValue::NumF(data.1.parse().unwrap())));
@@ -599,4 +599,57 @@ fn encode_db_return(vec: Vec<(u64, String)>, db_settings: &meta::DBSettings, que
     }
 
     json::encode(vec![("data", json::JSONValue::Array(json_array))])
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use rand::prelude::*;
+    use query::IndexType;
+    
+    const TEST_TABLE_1: &str = "testtable1";
+    const TEST_TABLE_2: &str = "testtable2";
+
+    fn common(table_name: &str, fn_name: &str, indexes: Vec<IndexType>, fn_param: &str) -> (meta::DBSettings, file::FileSystem, query::QueryResult) {
+        (
+            meta::load_meta("./test_data/test_schema.yaml"),
+            file::FileSystem::new(),
+            query::QueryResult {
+                table_name: table_name.to_string(),
+                fn_name: fn_name.to_string(),
+                indexes: indexes,
+                fn_param: fn_param.to_string(),
+            }
+        )
+    }
+
+    #[test]
+    fn test_return_encode() {
+        let (db_settings, _file_system, query) = common(TEST_TABLE_1, "", Vec::new(), "");
+
+        let pre_encode: Vec<(u64, String)> = vec![(1, String::from(r"1,2.123,hello\, world")),(2, String::from(r"1,2.123,hello\, world"))];
+        let result = encode_db_return(pre_encode, &db_settings, &query);
+        assert_eq!(result, String::from("{\"data\":[{\"index\":1,\"numi\":1,\"numf\":2.123,\"varchar\":\"hello, world\"},{\"index\":2,\"numi\":1,\"numf\":2.123,\"varchar\":\"hello, world\"}]}"));
+    }
+
+    #[test]
+    fn test_write_to_db() {
+        let mut rng = rand::rng();
+        let (mut db_settings, mut file_system, query) = common(TEST_TABLE_1, "write", vec![IndexType::Wildcard], r"1,2.22,hello\, world");
+
+        let result = write_to_db(&mut db_settings, &mut file_system, &query);
+        assert_eq!("200", result.get(9..12).unwrap()); // checks if return is 200
+
+        let random_uuid = format!("0x{:X}", rng.random::<u128>());
+        let query = query::QueryResult { table_name: TEST_TABLE_1.to_string(), indexes: vec![IndexType::Index(1)], fn_name: "write".to_string(), fn_param: format!("1,2.22,{}", random_uuid) };
+        let result = write_to_db(&mut db_settings, &mut file_system, &query);
+        assert_eq!("200", result.get(9..12).unwrap()); // checks if return is 200
+        let query = query::QueryResult { table_name: TEST_TABLE_1.to_string(), indexes: vec![IndexType::Index(1)], fn_name: String::new(), fn_param: String::new() };
+        let result = read_from_db(&db_settings, &mut file_system, &query);
+        assert_eq!(result.split("\r\n\r\n").last().unwrap().to_string(), String::from("{\"data\":[{\"index\":1,\"numi\":1,\"numf\":2.22,\"varchar\":\"") + random_uuid.as_str() + "\"}]}"); // has to be done like this since format! doesn't work due to use of curly braces in json
+
+        let query = query::QueryResult { table_name: TEST_TABLE_1.to_string(), indexes: vec![IndexType::Index(1)], fn_name: "write".to_string(), fn_param: String::from("this is incorrect data for this table, 22121, ghjello") };
+        let result = write_to_db(&mut db_settings, &mut file_system, &query);
+        assert_eq!("400", result.get(9..12).unwrap()); // checks if return is 400
+    }
 }

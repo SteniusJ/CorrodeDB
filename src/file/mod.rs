@@ -209,3 +209,54 @@ impl FileSystem {
         self.cache.insert(file_name, file_contents);
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use rand::prelude::*;
+
+    const TEST_READ_FILE_PATH: &str = "./test_data/test_read_file";
+    const TEST_WRITE_FILE_PATH: &str = "./test_data/test_write_file";
+
+    #[test]
+    fn test_file_system_open() {
+        let mut file_system = FileSystem::new();
+
+        file_system.open(TEST_READ_FILE_PATH).unwrap();
+        file_system.open(TEST_READ_FILE_PATH).expect_err("File open succeeded even when opening a already open file!");
+        
+        assert_eq!(&vec![String::from("hello world"), String::from("hello world1")], file_system.cache.get(TEST_READ_FILE_PATH).unwrap());
+    }
+
+    #[test]
+    fn test_file_system_read() {
+        let mut file_system = FileSystem::new();
+
+        file_system.open(TEST_READ_FILE_PATH).expect("File open failed, not relevant to this test");
+        
+        let result = file_system.read_from_cache(TEST_READ_FILE_PATH).expect("File read failed");
+        let result_single_line = file_system.read_line_from_cache(TEST_READ_FILE_PATH, 0).unwrap();
+        file_system.read_line_from_cache(TEST_READ_FILE_PATH, 3).expect_err("Filesystem read a line that doesn't exist");
+
+        assert_eq!(result, vec![String::from("hello world"), String::from("hello world1")]);
+        assert_eq!(result_single_line, String::from("hello world"));
+    }
+
+    #[test]
+    fn test_file_system_write() {
+        let mut file_system = FileSystem::new();
+        let mut rng = rand::rng();
+        let rand_uuid = format!("0x{:X}",rng.random::<u128>());
+
+        file_system.open(TEST_WRITE_FILE_PATH).expect("File open failed, not relevant to this test");
+        file_system.write_to_cache(TEST_WRITE_FILE_PATH, rand_uuid.clone()).unwrap();
+        let cache_result = file_system.read_from_cache(TEST_WRITE_FILE_PATH).unwrap();
+        assert_eq!(cache_result.last().unwrap(), &rand_uuid);
+
+        file_system.write_cache_to_disk(TEST_WRITE_FILE_PATH).unwrap();
+
+        file_system.open(TEST_WRITE_FILE_PATH).expect("File open failed, not relevant to this test");
+        let result = file_system.read_from_cache(TEST_WRITE_FILE_PATH).expect("File read failed, not relevant to this test");
+        assert_eq!(result.last().unwrap(), &rand_uuid);
+    }
+}
