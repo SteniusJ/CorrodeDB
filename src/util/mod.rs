@@ -1,5 +1,6 @@
 use regex::Regex;
 
+/// Splits str by char ingoring those that have been escaped
 pub fn escape_split(input: &str, split_char: char) -> Vec<&str> {
     let mut skip = false;
     let mut last_split_i = 0;
@@ -26,10 +27,12 @@ pub fn escape_split(input: &str, split_char: char) -> Vec<&str> {
     splits
 }
 
+/// Removes the / escape character from a string
 pub fn remove_escape_characters(input: String) -> String {
     input.replace("\\", "")
 }
 
+/// Parses program arguments
 pub fn parse_program_args(args: Vec<String>) -> Vec<(String, String)>{
     let arguments_string = args.join(" ");
     let re = Regex::new(r"(?<flag>-[[:alpha:]]*) (?<param>[[:ascii:]-- -]*)").unwrap();

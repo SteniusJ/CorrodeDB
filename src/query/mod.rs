@@ -22,6 +22,7 @@ impl fmt::Display for QueryResult {
     }
 }
 
+/// Parses database query
 pub fn parse_query(query_str: &str) -> Result<QueryResult> {
     let re = Regex::new(r"(?<table_name>[[:alnum:]]*)\[(?<index>[[:digit:],.*]*)\] ?(?<function_name>[[:alnum:]]*) ?(?<function_params>[[:ascii:]]*)\)?").unwrap();
 

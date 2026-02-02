@@ -28,6 +28,7 @@ pub struct ColSettings {
 }
 
 impl DBSettings {
+    /// Create new DBSettings struct from yaml string
     pub fn new(settings_yaml: &str) -> DBSettings {
         let docs = YamlLoader::load_from_str(settings_yaml).unwrap();
         let doc = &docs[0];
@@ -119,6 +120,7 @@ impl TableSettings {
     }
 }
 
+/// Loads DBSettings struct from file path to valid yaml file
 pub fn load_meta(meta_file_path: &str) -> DBSettings {
     println!("---------------- loading schema -------------------\nloading schema yaml file from: {meta_file_path}\n");
 

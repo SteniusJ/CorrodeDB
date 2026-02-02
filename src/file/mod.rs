@@ -82,6 +82,8 @@ impl FileSystem {
         Ok(contents)
     }
 
+    /// Returns data from given line
+    /// Returns error if line is outside file size
     pub fn read_line_from_cache(&mut self, file_name: &str, line: usize) -> Result<String> {
         let line = line;
 
@@ -125,6 +127,7 @@ impl FileSystem {
         }
     }
 
+    /// Writes all entires is cache to storage
     pub fn write_entire_cache_to_disk(&mut self) -> Result<Status> {
         let keys: Vec<String> = self.cache.keys().cloned().collect();
 
@@ -200,6 +203,7 @@ impl FileSystem {
         false
     }
 
+    /// Returns file names of all files in cache
     pub fn get_cached_files(&self) -> std::collections::hash_map::Keys<'_, String, Vec<String>> {
         self.cache.keys()
     }

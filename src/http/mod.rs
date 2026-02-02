@@ -31,6 +31,7 @@ struct HTTPRequestHeader {
 }
 
 impl<'a> HTTPServer<'a> {
+    /// Creates new http server
     pub fn new(address: String) -> HTTPServer<'a> {
         HTTPServer {
             endpoints: HashMap::new(),
@@ -38,12 +39,16 @@ impl<'a> HTTPServer<'a> {
             address: address,
         }
     }
+    /// Adds endpoint to http server
     pub fn add_endpoint(&mut self, enpoint: &str, method: HTTPRequestMethods, closure: impl FnMut(String, HashMap<String, String>) -> String + 'a) {
         self.endpoints.insert((enpoint.to_string(), method), Box::new(closure));
     }
+    /// Adds middleware to http server
+    /// All middleware is executed before any endpoint access
     pub fn add_middleware(&mut self, closure: impl FnMut(&mut String, &mut HashMap<String, String>) -> (bool, String) + 'a) {
         self.middleware.push(Box::new(closure));
     }
+    /// Server starts listening to http trafic
     pub fn listen(&mut self) {
         let listener = create_tcp_listener(self.address.as_str());
         
@@ -79,14 +84,17 @@ impl<'a> HTTPServer<'a> {
     }
 }
 
+/// Formats http response
 pub fn create_http_response(status_code: u16, content_type: &str, content: &str) -> String {
     format!("{}\r\nContent-Length: {}\r\nContent-Type: {}\r\n\r\n{}", parse_http_status_code(status_code), content.len(), content_type, content)
 }
 
+/// Creates tcp listener for give address
 fn create_tcp_listener(address: &str) -> TcpListener {
     TcpListener::bind(address).unwrap()
 }
 
+/// Creates HTTPRequestMethods struct from method string
 fn parse_http_method(method_str: &str) -> HTTPRequestMethods {
     match method_str {
         "GET" => HTTPRequestMethods::GET,
@@ -98,6 +106,7 @@ fn parse_http_method(method_str: &str) -> HTTPRequestMethods {
     }
 }
 
+/// Parses status code to http header
 fn parse_http_status_code(code: u16) -> String {
     match code {
         200 => "HTTP/1.1 200 OK".to_string(),
@@ -110,6 +119,7 @@ fn parse_http_status_code(code: u16) -> String {
     }
 }
 
+/// Parses http request and returns HTTPRequestHeader struct
 fn parse_http_request_header(buf_reader: &mut BufReader<&mut TcpStream>) -> HTTPRequestHeader {
     let mut request_header = HTTPRequestHeader {
         method: HTTPRequestMethods::NONE,

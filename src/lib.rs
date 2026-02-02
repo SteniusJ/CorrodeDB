@@ -17,6 +17,7 @@ pub struct ProgramArgs {
     pub port: String,
 }
 
+/// Loads program arguments
 pub fn load_program_arguments() -> ProgramArgs {
     let mut program_args = ProgramArgs {
         schema_path: String::from(DEFAULT_SCHEMA_FILE_PATH),
@@ -43,6 +44,7 @@ pub fn load_program_arguments() -> ProgramArgs {
     program_args
 }
 
+/// Starts database server
 pub fn start_database(schema_path: &str, port: &str) {
     // Order of definition is critical,
     // variables used inside endpoints of the http_server
@@ -79,6 +81,7 @@ pub fn start_database(schema_path: &str, port: &str) {
             return http::create_http_response(404, "application/json", json::encode(vec![("error", json::JSONValue::String("Given table does not exist".to_string()))]).as_str());
         }
 
+        // Run any function if none read from database
         match query.fn_name.as_str() {
             "write" => write_to_db(&mut db_settings, &mut file_system, &query),
             "random" => random_from_db(&mut db_settings, &mut file_system, &mut query),
@@ -92,6 +95,7 @@ pub fn start_database(schema_path: &str, port: &str) {
     http_server.listen();
 }
 
+/// Reads file from database
 fn file_read(file_name: &str, file_system: &mut file::FileSystem) -> Result<Vec<String>> {
     match file_system.open(file_name) {
         Ok(_) => (),
@@ -108,6 +112,7 @@ fn file_read(file_name: &str, file_system: &mut file::FileSystem) -> Result<Vec<
     Ok(file_data)
 }
 
+/// Returns line, function name and database index
 fn get_line_fname_idx(db_settings: &meta::DBSettings, query: &query::QueryResult, index: u64) -> (u64, String, u64) {
     let container = num::integer::div_floor(index, db_settings.compartment_rows as u64);
     let line = if index < db_settings.compartment_rows as u64 {index} else {index - db_settings.compartment_rows as u64};
@@ -117,10 +122,12 @@ fn get_line_fname_idx(db_settings: &meta::DBSettings, query: &query::QueryResult
     (line, file_name, index)
 }
 
+/// Returns database index
 fn get_index(line: u64, container: u64, db_settings: &meta::DBSettings) -> u64 {
     line + (container * db_settings.compartment_rows as u64)
 }
 
+/// Writes to database
 fn file_write(file_name: &str, file_data: Vec<String>, file_system: &mut file::FileSystem) -> bool {
     match file_system.write_to_cache(file_name, file_data.join("\n")) {
         Ok(_) => (),
@@ -135,6 +142,7 @@ fn file_write(file_name: &str, file_data: Vec<String>, file_system: &mut file::F
     }
 }
 
+/// Reads line from database
 fn read_line(file_name: &str, file_system: &mut file::FileSystem, line: u64) -> Result<String> {
     match file_system.open(file_name) {
         Ok(_) => (),
@@ -158,10 +166,14 @@ fn read_line(file_name: &str, file_system: &mut file::FileSystem, line: u64) -> 
     }
 }
 
+/// Where function logic
+///
+/// Returns data which matches condition
 fn where_from_db(db_settings: &mut meta::DBSettings, file_system: &mut file::FileSystem, query: &query::QueryResult) -> String {
     let mut result: Vec<(u64, String)> = Vec::new();
     let mut arguments = util::escape_split(query.fn_param.as_str(), ',').into_iter();
 
+    // Assign variables necessary for conditon matching
     let column = {
         let Some(column) = arguments.next() else {
             return http::create_http_response(400, "application/json", json::encode(vec![("error", json::JSONValue::String("Please give a column name".to_string()))]).as_str());
@@ -195,6 +207,10 @@ fn where_from_db(db_settings: &mut meta::DBSettings, file_system: &mut file::Fil
         return http::create_http_response(400, "application/json", json::encode(vec![("error", json::JSONValue::String("Please give a comparison value".to_string()))]).as_str());
     };
 
+    /// Checks if condition is matching
+    /// Returns Ok(true) if condition matches
+    /// Returns Ok(false) if condition is not matching
+    /// Returns Err(_) on incorrect operator value pair
     fn is_matching(column_value: &meta::ColValue, column_content: &str, match_value: &str, operator: &str) -> Result<bool> {
         match operator {
             ">" => {
@@ -339,6 +355,10 @@ fn where_from_db(db_settings: &mut meta::DBSettings, file_system: &mut file::Fil
     http::create_http_response(200, "application/json", encode_db_return(result, &db_settings, &query).as_str())
 }
 
+/// Remove function logic
+///
+/// Removes data from database
+/// Overwrites data with empty string effectively deleting it
 fn remove_from_db(db_settings: &mut meta::DBSettings, file_system: &mut file::FileSystem, query: &query::QueryResult) -> String {
     if query.indexes.len() > 1 {
         return http::create_http_response(400, "application/json", json::encode(vec![("error", json::JSONValue::String("Data can only be removed from one index at a time".to_string()))]).as_str());
@@ -363,6 +383,9 @@ fn remove_from_db(db_settings: &mut meta::DBSettings, file_system: &mut file::Fi
     }
 }
 
+/// random function logic
+///
+/// Returns random values from database
 fn random_from_db(db_settings: &mut meta::DBSettings, file_system: &mut file::FileSystem, query: &mut query::QueryResult) -> String {
     let mut rng = rand::rng();
 
@@ -418,6 +441,8 @@ fn random_from_db(db_settings: &mut meta::DBSettings, file_system: &mut file::Fi
     read_from_db(db_settings, file_system, query)
 }
 
+/// Reads data from database
+/// Default functionality
 fn read_from_db(db_settings: &meta::DBSettings, file_system: &mut file::FileSystem, query: &query::QueryResult) -> String {
     let mut result: Vec<(u64, String)> = Vec::new();
 
@@ -474,6 +499,9 @@ fn read_from_db(db_settings: &meta::DBSettings, file_system: &mut file::FileSyst
     http::create_http_response(200, "application/json", encode_db_return(result, &db_settings, &query).as_str())
 }
 
+/// write function logic
+///
+/// Writes data to database
 fn write_to_db(db_settings: &mut meta::DBSettings, file_system: &mut file::FileSystem, query: &query::QueryResult) -> String {
     if query.indexes.len() > 1 {
         return http::create_http_response(400, "application/json", json::encode(vec![("error", json::JSONValue::String("Data can only be written to one index at a time".to_string()))]).as_str());
@@ -486,6 +514,7 @@ fn write_to_db(db_settings: &mut meta::DBSettings, file_system: &mut file::FileS
         return http::create_http_response(400, "application/json", json::encode(vec![("error", json::JSONValue::String("The number of arguments does not match the number of data columns in the database".to_string()))]).as_str());
     }
 
+    // Check if given data matches column data types
     for row_data in row_data_split.iter().enumerate() {
         let col_data = &columns[row_data.0];
 
@@ -504,6 +533,8 @@ fn write_to_db(db_settings: &mut meta::DBSettings, file_system: &mut file::FileS
         }
     }
 
+    // Since data can only be written to one index at a time
+    // we only need to look at the first index.
     match &query.indexes[0] {
         query::IndexType::Index(i) => {
             let (line, file_name, index) = get_line_fname_idx(db_settings, query, *i);
@@ -544,6 +575,7 @@ fn write_to_db(db_settings: &mut meta::DBSettings, file_system: &mut file::FileS
     }
 }
 
+/// Encodes returned data from file read into a json string
 fn encode_db_return(vec: Vec<(u64, String)>, db_settings: &meta::DBSettings, query: &query::QueryResult) -> String {
     let db_cols = &db_settings.tables.get(query.table_name.as_str()).unwrap().columns;
     let mut json_array: Vec<json::JSONValue> = Vec::new();
