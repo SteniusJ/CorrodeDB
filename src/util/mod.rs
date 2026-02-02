@@ -1,3 +1,5 @@
+use regex::Regex;
+
 pub fn escape_split(input: &str, split_char: char) -> Vec<&str> {
     let mut skip = false;
     let mut last_split_i = 0;
@@ -29,34 +31,16 @@ pub fn remove_escape_characters(input: String) -> String {
 }
 
 pub fn parse_program_args(args: Vec<String>) -> Vec<(String, String)>{
+    let arguments_string = args.join(" ");
+    let re = Regex::new(r"(?<flag>-[[:alpha:]]*) (?<param>[[:ascii:]-- -]*)").unwrap();
+
     let mut parsed_args: Vec<(String, String)> = Vec::new();
-    let mut flag = String::new();
 
-    for arg in args {
-        if arg == "target/debug/db-project" { // temp fix, skips debug argument which is
-                                              // automatically sent
-            continue;
-        }
+    let captures = re.captures_iter(&arguments_string);
 
-        if flag.is_empty() {
-            if !is_flag(&arg) {
-                panic!("expected flag in program arguments, please give arguments in the format '[flag] [value]'");
-            }
-            flag = arg;
-            continue;
-        }
-
-        if is_flag(&arg) {
-            panic!("expected value in program arguments, please give arguments in the format '[flag] [value]'")
-        }
-
-        parsed_args.push((flag, arg));
-        flag = String::new();
+    for argument in captures {
+        parsed_args.push((argument["flag"].to_string(), argument["param"].to_string()));
     }
 
     parsed_args
-}
-
-fn is_flag(argument: &String) -> bool {
-    argument.chars().next().unwrap() == '-'
 }

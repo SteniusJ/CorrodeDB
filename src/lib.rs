@@ -35,7 +35,7 @@ pub fn load_program_arguments() -> ProgramArgs {
                 program_args.port = value;
             },
             f=> {
-                panic!("flag {f} is not a valid flag");
+                println!("flag {f} is not a valid flag");
             },
         }
     }
@@ -181,7 +181,7 @@ fn where_from_db(db_settings: &mut meta::DBSettings, file_system: &mut file::Fil
         if operator.is_empty() {
             return http::create_http_response(400, "application/json", json::encode(vec![("error", json::JSONValue::String("Please give a operator".to_string()))]).as_str());
         }
-        if !match operator { // not optimal, improve this!!!
+        if !match operator {
             ">" => true,
             "<" => true,
             "=" => true,
@@ -562,7 +562,7 @@ fn encode_db_return(vec: Vec<(u64, String)>, db_settings: &meta::DBSettings, que
 
             match col_data.value {
                 meta::ColValue::NumberI => {
-                    json_object.push((col_data.name.clone(), json::JSONValue::NumI(data.1.parse().unwrap()))); // look into this! is parsing even necessary? Pretty sure the value is already validated as the correct type by this point. Just adding extra overhead?
+                    json_object.push((col_data.name.clone(), json::JSONValue::NumI(data.1.parse().unwrap())));
                 },
                 meta::ColValue::NumberF => {
                     json_object.push((col_data.name.clone(), json::JSONValue::NumF(data.1.parse().unwrap())));

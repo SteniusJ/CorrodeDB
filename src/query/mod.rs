@@ -23,7 +23,7 @@ impl fmt::Display for QueryResult {
 }
 
 pub fn parse_query(query_str: &str) -> Result<QueryResult> {
-    let re = Regex::new(r"(?<table_name>[[:alnum:]]*)\[(?<index>[[:digit:],.*]*)\] ?(?<function_name>[[:alnum:]]*) ?(?<function_params>[[:ascii:]]*)\)?").unwrap(); // <- proper error handling needed
+    let re = Regex::new(r"(?<table_name>[[:alnum:]]*)\[(?<index>[[:digit:],.*]*)\] ?(?<function_name>[[:alnum:]]*) ?(?<function_params>[[:ascii:]]*)\)?").unwrap();
 
     let Some(captures) = re.captures(query_str) else {
         return Err(std::io::Error::new(std::io::ErrorKind::NotFound, "No captures found"));
@@ -61,7 +61,7 @@ pub fn parse_query(query_str: &str) -> Result<QueryResult> {
             }
         }
 
-        indexes.push(IndexType::Index(index_str.parse().unwrap())) // error handling
+        indexes.push(IndexType::Index(index_str.parse().unwrap()))
     }
 
     Ok(QueryResult {

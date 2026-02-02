@@ -155,9 +155,7 @@ pub fn load_meta(meta_file_path: &str) -> DBSettings {
             Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => {
                 let last_file_name = match file_system.read_folder(format!("./tables/{table_name}").as_str()).last() {
                     Some(r) => {
-                        r.unwrap().file_name().into_string().unwrap() // Improved error handling maybe needed?
-                                                                      // Potentially not needed, since code is only executed on application startup.
-                                                                      // Low priority!!
+                        r.unwrap().file_name().into_string().unwrap()
                     },
                     None => {
                         table.1.biggest_id = 0;
