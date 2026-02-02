@@ -62,7 +62,7 @@ impl<'a> HTTPServer<'a> {
             for middleware in &mut self.middleware {
                 let middleware_res = middleware(&mut request_header.content, &mut request_header.url_parameters);
                 if !middleware_res.0 {
-                    res = create_http_response(400, "application/json", format!("\"error\":\"{}\"", middleware_res.1).as_str());
+                    res = create_http_response(401, "application/json", format!("\"error\":\"{}\"", middleware_res.1).as_str());
                     break;
                 }
             }
