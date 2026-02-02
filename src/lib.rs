@@ -170,7 +170,7 @@ fn where_from_db(db_settings: &mut meta::DBSettings, file_system: &mut file::Fil
             return http::create_http_response(400, "application/json", json::encode(vec![("error", json::JSONValue::String("Please give a column name".to_string()))]).as_str());
         }
         if !db_settings.tables.get(&query.table_name).unwrap().has_column(column.to_string()) {
-            return http::create_http_response(404, "application/json", json::encode(vec![("error", json::JSONValue::String("Column does not exist in table".to_string()))]).as_str()); // improve error message
+            return http::create_http_response(404, "application/json", json::encode(vec![("error", json::JSONValue::String(format!("Column '{}' does not exist in table '{}'", column, &query.table_name)))]).as_str());
         }
         column
     };
@@ -492,12 +492,12 @@ fn write_to_db(db_settings: &mut meta::DBSettings, file_system: &mut file::FileS
         match col_data.value {
             meta::ColValue::NumberI => {
                 if row_data.1.parse::<i64>().is_err() {
-                    return http::create_http_response(400, "application/json", json::encode(vec![("error", json::JSONValue::String("Data type does not match column data type".to_string()))]).as_str()); // More descriptive error. Include index and correct data type
+                    return http::create_http_response(400, "application/json", json::encode(vec![("error", json::JSONValue::String(format!("Data type does not match column data type which is NumberI")))]).as_str());
                 }
             },
             meta::ColValue::NumberF => {
                 if row_data.1.parse::<f64>().is_err() {
-                    return http::create_http_response(400, "application/json", json::encode(vec![("error", json::JSONValue::String("Data type does not match column data type".to_string()))]).as_str());  // More descriptive error. Include index and correct data type
+                    return http::create_http_response(400, "application/json", json::encode(vec![("error", json::JSONValue::String(format!("Data type does not match column data type which is NumberF")))]).as_str());
                 }
             },
             _ => (),
