@@ -101,8 +101,11 @@ fn parse_http_method(method_str: &str) -> HTTPRequestMethods {
 fn parse_http_status_code(code: u16) -> String {
     match code {
         200 => "HTTP/1.1 200 OK".to_string(),
+        201 => "HTTP/1.1 201 Created".to_string(),
         400 => "HTTP/1.1 400 Bad Request".to_string(),
+        401 => "HTTP/1.1 401 Unauthorized".to_string(),
         404 => "HTTP/1.1 404 Not Found".to_string(),
+        500 => "HTTP/1.1 500 Internal Server Error".to_string(),
         _ => "".to_string(),
     }
 }

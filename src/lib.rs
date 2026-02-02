@@ -76,7 +76,7 @@ pub fn start_database(schema_path: &str, port: &str) {
         println!("{query:?}");
 
         if !db_settings.table_exists(&query.table_name) {
-            return http::create_http_response(400, "application/json", json::encode(vec![("error", json::JSONValue::String("Given table does not exist".to_string()))]).as_str());
+            return http::create_http_response(404, "application/json", json::encode(vec![("error", json::JSONValue::String("Given table does not exist".to_string()))]).as_str());
         }
 
         match query.fn_name.as_str() {
@@ -85,7 +85,7 @@ pub fn start_database(schema_path: &str, port: &str) {
             "remove" => remove_from_db(&mut db_settings, &mut file_system, &query),
             "where" => where_from_db(&mut db_settings, &mut file_system, &query),
             "" => read_from_db(&mut db_settings, &mut file_system, &query),
-            _ => http::create_http_response(400, "application/json", json::encode(vec![("error", json::JSONValue::String("Given function does not exist".to_string()))]).as_str()),
+            _ => http::create_http_response(404, "application/json", json::encode(vec![("error", json::JSONValue::String("Given function does not exist".to_string()))]).as_str()),
         }
     });
 
@@ -164,22 +164,22 @@ fn where_from_db(db_settings: &mut meta::DBSettings, file_system: &mut file::Fil
 
     let column = {
         let Some(column) = arguments.next() else {
-            return http::create_http_response(200, "application/json", json::encode(vec![("error", json::JSONValue::String("Please give a column name".to_string()))]).as_str());
+            return http::create_http_response(400, "application/json", json::encode(vec![("error", json::JSONValue::String("Please give a column name".to_string()))]).as_str());
         };
         if column.is_empty() {
-            return http::create_http_response(200, "application/json", json::encode(vec![("error", json::JSONValue::String("Please give a column name".to_string()))]).as_str());
+            return http::create_http_response(400, "application/json", json::encode(vec![("error", json::JSONValue::String("Please give a column name".to_string()))]).as_str());
         }
         if !db_settings.tables.get(&query.table_name).unwrap().has_column(column.to_string()) {
-            return http::create_http_response(200, "application/json", json::encode(vec![("error", json::JSONValue::String("Column does not exist in table".to_string()))]).as_str()); // improve error message
+            return http::create_http_response(404, "application/json", json::encode(vec![("error", json::JSONValue::String("Column does not exist in table".to_string()))]).as_str()); // improve error message
         }
         column
     };
     let operator = {
         let Some(operator) = arguments.next() else {
-            return http::create_http_response(200, "application/json", json::encode(vec![("error", json::JSONValue::String("Please give a operator".to_string()))]).as_str());
+            return http::create_http_response(400, "application/json", json::encode(vec![("error", json::JSONValue::String("Please give a operator".to_string()))]).as_str());
         };
         if operator.is_empty() {
-            return http::create_http_response(200, "application/json", json::encode(vec![("error", json::JSONValue::String("Please give a operator".to_string()))]).as_str());
+            return http::create_http_response(400, "application/json", json::encode(vec![("error", json::JSONValue::String("Please give a operator".to_string()))]).as_str());
         }
         if !match operator { // not optimal, improve this!!!
             ">" => true,
@@ -187,12 +187,12 @@ fn where_from_db(db_settings: &mut meta::DBSettings, file_system: &mut file::Fil
             "=" => true,
             _ => false,
         } {
-            return http::create_http_response(200, "application/json", json::encode(vec![("error", json::JSONValue::String(format!("{operator} is not a valid operator")))]).as_str());
+            return http::create_http_response(400, "application/json", json::encode(vec![("error", json::JSONValue::String(format!("{operator} is not a valid operator")))]).as_str());
         }
         operator
     };
     let Some(value) = arguments.next() else {
-        return http::create_http_response(200, "application/json", json::encode(vec![("error", json::JSONValue::String("Please give a comparison value".to_string()))]).as_str());
+        return http::create_http_response(400, "application/json", json::encode(vec![("error", json::JSONValue::String("Please give a comparison value".to_string()))]).as_str());
     };
 
     fn is_matching(column_value: &meta::ColValue, column_content: &str, match_value: &str, operator: &str) -> Result<bool> {
@@ -276,7 +276,7 @@ fn where_from_db(db_settings: &mut meta::DBSettings, file_system: &mut file::Fil
                     },
                     Err(e) if e.kind() == ErrorKind::Other => (),
                     Err(_) => {
-                        return http::create_http_response(200, "application/json", json::encode(vec![("error", json::JSONValue::String("Index out of table range".to_string()))]).as_str());
+                        return http::create_http_response(404, "application/json", json::encode(vec![("error", json::JSONValue::String("Index out of table range".to_string()))]).as_str());
                     }
                 };
             },
@@ -351,15 +351,15 @@ fn remove_from_db(db_settings: &mut meta::DBSettings, file_system: &mut file::Fi
     let (line, file_name, index) = get_line_fname_idx(db_settings, query, i);
 
     let Ok(mut file_data) = file_read(file_name.as_str(), file_system) else {
-        return http::create_http_response(400, "application/json", json::encode(vec![("error", json::JSONValue::String("File read error".to_string()))]).as_str());
+        return http::create_http_response(500, "application/json", json::encode(vec![("error", json::JSONValue::String("File read error".to_string()))]).as_str());
     };
 
     file_data.insert(line as usize, String::new()); // Overwrite current value with empty String
     
     if file_write(file_name.as_str(), file_data, file_system) {
-        return http::create_http_response(200, "application/json", json::encode(vec![("error", json::JSONValue::String(format!("Item at index {index} has been removed")))]).as_str());
+        return http::create_http_response(200, "application/json", json::encode(vec![("status", json::JSONValue::String(format!("Item at index {index} has been removed")))]).as_str());
     } else {
-        return http::create_http_response(400, "application/json", json::encode(vec![("error", json::JSONValue::String("Removal of Item failed due to a write error".to_string()))]).as_str())
+        return http::create_http_response(500, "application/json", json::encode(vec![("error", json::JSONValue::String("Removal of Item failed due to a write error".to_string()))]).as_str())
     }
 }
 
@@ -375,7 +375,7 @@ fn random_from_db(db_settings: &mut meta::DBSettings, file_system: &mut file::Fi
     match &query.indexes[0] {
         query::IndexType::Index(_) => {
             if query.indexes.len() < nr_of_random_values as usize {
-                return http::create_http_response(400, "application/json", json::encode(vec![("error", json::JSONValue::String("Attempting to retrieve more random values than the given query includes".to_string()))]).as_str())
+                return http::create_http_response(404, "application/json", json::encode(vec![("error", json::JSONValue::String("Attempting to retrieve more random values than the given query includes".to_string()))]).as_str())
             }
 
             let mut indexes: Vec<u64> = (0..=query.indexes.len() as u64).collect();
@@ -386,7 +386,7 @@ fn random_from_db(db_settings: &mut meta::DBSettings, file_system: &mut file::Fi
         },
         query::IndexType::Wildcard => {
             if biggest_id + 1 < nr_of_random_values {
-                return http::create_http_response(400, "application/json", json::encode(vec![("error", json::JSONValue::String("Attempting to retrieve more random values than the table includes".to_string()))]).as_str())
+                return http::create_http_response(404, "application/json", json::encode(vec![("error", json::JSONValue::String("Attempting to retrieve more random values than the table includes".to_string()))]).as_str())
             }
 
             let mut indexes: Vec<u64> = (0..=biggest_id).collect();
@@ -401,7 +401,7 @@ fn random_from_db(db_settings: &mut meta::DBSettings, file_system: &mut file::Fi
                     Ok(content) => result.push((index, content)),
                     Err(e) if e.kind() == ErrorKind::Other => (),
                     Err(_) => {
-                        return http::create_http_response(200, "application/json", json::encode(vec![("error", json::JSONValue::String("Index out of table range".to_string()))]).as_str());
+                        return http::create_http_response(400, "application/json", json::encode(vec![("error", json::JSONValue::String("Index out of table range".to_string()))]).as_str());
                     }
                 };
 
@@ -411,7 +411,7 @@ fn random_from_db(db_settings: &mut meta::DBSettings, file_system: &mut file::Fi
                     return http::create_http_response(200, "application/json", encode_db_return(result, &db_settings, &query).as_str());
                 }
             }
-            return http::create_http_response(200, "application/json", json::encode(vec![("error", json::JSONValue::String("Attempting to retrieve more values that the table includes".to_string()))]).as_str());
+            return http::create_http_response(404, "application/json", json::encode(vec![("error", json::JSONValue::String("Attempting to retrieve more values that the table includes".to_string()))]).as_str());
         }
     }
 
@@ -431,7 +431,7 @@ fn read_from_db(db_settings: &meta::DBSettings, file_system: &mut file::FileSyst
                     Ok(content) => result.push((index, content)),
                     Err(e) if e.kind() == ErrorKind::Other => (),
                     Err(_) => {
-                        return http::create_http_response(200, "application/json", json::encode(vec![("error", json::JSONValue::String("Index out of table range".to_string()))]).as_str());
+                        return http::create_http_response(404, "application/json", json::encode(vec![("error", json::JSONValue::String("Index out of table range".to_string()))]).as_str());
                     }
                 };
             },
@@ -510,15 +510,15 @@ fn write_to_db(db_settings: &mut meta::DBSettings, file_system: &mut file::FileS
             let (line, file_name, index) = get_line_fname_idx(db_settings, query, *i);
 
             let Ok(mut file_data) = file_read(file_name.as_str(), file_system) else {
-                return http::create_http_response(400, "application/json", json::encode(vec![("error", json::JSONValue::String("File read error".to_string()))]).as_str());
+                return http::create_http_response(500, "application/json", json::encode(vec![("error", json::JSONValue::String("File read error".to_string()))]).as_str());
             };
 
             file_data.insert(line as usize, query.fn_param.clone());
 
             if file_write(file_name.as_str(), file_data, file_system) {
-                return http::create_http_response(200, "application/json", json::encode(vec![("error", json::JSONValue::String(format!("Item at index {index} has been removed")))]).as_str());
+                return http::create_http_response(200, "application/json", json::encode(vec![("status", json::JSONValue::String(format!("Item at index {index} has been removed")))]).as_str());
             } else {
-                return http::create_http_response(400, "application/json", json::encode(vec![("error", json::JSONValue::String("Removal of Item failed due to a write error".to_string()))]).as_str())
+                return http::create_http_response(500, "application/json", json::encode(vec![("error", json::JSONValue::String("Removal of Item failed due to a write error".to_string()))]).as_str())
             }
         },
         query::IndexType::Wildcard => {
@@ -530,7 +530,7 @@ fn write_to_db(db_settings: &mut meta::DBSettings, file_system: &mut file::FileS
             let (_line, file_name, _index) = get_line_fname_idx(db_settings, query, table_max_index);
 
             let Ok(mut file_data) = file_read(file_name.as_str(), file_system) else {
-                return http::create_http_response(400, "application/json", json::encode(vec![("error", json::JSONValue::String("File read error".to_string()))]).as_str());
+                return http::create_http_response(500, "application/json", json::encode(vec![("error", json::JSONValue::String("File read error".to_string()))]).as_str());
             };
 
             file_data.push(query.fn_param.clone());
@@ -539,7 +539,7 @@ fn write_to_db(db_settings: &mut meta::DBSettings, file_system: &mut file::FileS
                 db_settings.iterate_id(&query.table_name);
                 return http::create_http_response(200, "application/json", json::encode(vec![("status", json::JSONValue::String(format!("Write success"))), ("index", json::JSONValue::NumI(table_max_index as i64))]).as_str());
             } else {
-                return http::create_http_response(400, "application/json", json::encode(vec![("error", json::JSONValue::String("Write failed".to_string()))]).as_str())
+                return http::create_http_response(500, "application/json", json::encode(vec![("error", json::JSONValue::String("Write failed".to_string()))]).as_str())
             }
         },
     }
