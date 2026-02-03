@@ -60,7 +60,6 @@ pub fn start_database(schema_path: &str, port: &str) {
         }
  
         if url_params.get("password").unwrap() == &db_password {
-            println!("password: {}, matches given_password: {}", url_params.get("password").unwrap(), db_password);
             return (true, String::new());
         }
         (false, "Given password is incorrect".to_string())

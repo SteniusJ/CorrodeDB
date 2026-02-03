@@ -1,4 +1,4 @@
-use db_project::{start_database, load_program_arguments};
+use CorrodeDB::{start_database, load_program_arguments};
 
 fn main() {
     let program_args = load_program_arguments();

@@ -177,9 +177,9 @@ fn parse_http_request_header(buf_reader: &mut BufReader<&mut TcpStream>) -> HTTP
             continue;
         }
 
-        match *line_split.get(0).unwrap() {
-            "Content-Type" => request_header.content_type = line_split.get(1).unwrap().to_string(),
-            "Content-Length" => request_header.content_length = line_split.get(1).unwrap().parse().unwrap(),
+        match line_split.get(0).unwrap().to_lowercase().as_str() {
+            "content-type" => request_header.content_type = line_split.get(1).unwrap().to_string(),
+            "content-length" => request_header.content_length = line_split.get(1).unwrap().parse().unwrap(),
             _ => (),
         }
     }
