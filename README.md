@@ -1,6 +1,6 @@
 # CorrodeDB
 
-CorrodeDB is a simple "array like" database where queries are optimized for getting data from index positions. It has support for four functions that add vital functionality and improve usability, more info about these functions can be found below in the **Queries** section.
+CorrodeDB is a simple "vector like" database where queries are optimized for getting data from index positions. It has support for four functions that add vital functionality and improve usability, more info about these functions can be found below in the **Queries** section.
 
 ## Compatability
 
@@ -135,3 +135,4 @@ this query will get all the rows in the range **10 to (including) 50** where the
 `messages[1,20,36,37,49,90] where number,<,20`<br>
 this query will get all the rows from the indexes **1,20,36,37,49,90** where the column **number** is less than 20<br>
 **note!** this operator can only be used with Number values
+
