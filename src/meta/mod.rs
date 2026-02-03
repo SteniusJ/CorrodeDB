@@ -155,15 +155,17 @@ pub fn load_meta(meta_file_path: &str) -> DBSettings {
         match file_system.create_folder(format!("./tables/{table_name}").as_str()) {
             Ok(_) => println!("created folder for table: {table_name}"),
             Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => {
-                let last_file_name = match file_system.read_folder(format!("./tables/{table_name}").as_str()).last() {
-                    Some(r) => {
-                        r.unwrap().file_name().into_string().unwrap()
-                    },
-                    None => {
-                        table.1.biggest_id = 0;
-                        println!("biggest id for table '{table_name}' is '0'\n");
-                        continue;
-                    },
+                let last_file_name = {
+                    let mut highest_file: u32 = 0;
+                    for dir_entry in file_system.read_folder(format!("./tables/{table_name}").as_str()) {
+                        let dir_entry = dir_entry.unwrap();
+                        let fname = dir_entry.file_name().into_string().unwrap().parse::<u32>().unwrap();
+                        if highest_file < fname {
+                            highest_file = fname;
+                        }
+                    }
+
+                    format!("{highest_file}")
                 };
 
                 file_system.open(format!("./tables/{table_name}/{last_file_name}").as_str()).unwrap();
