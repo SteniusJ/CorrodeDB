@@ -1,20 +1,14 @@
 tables: # all db tables come under here
-  messages: # table 1
-    rows: # rows of table "messages" come here
-      id: # row 1 "id"
-        value: NumberI # value type of row 1 Integer number
-      message: # row 2 "message"
-        value: VarChar
-      time_posted: # row 3 "value"
-        value: VarChar
-  reactions: # table 2
-    rows:
-      id:
-        value: NumberF # number with decimal point
-      reaction:
-        value: VarChar
-  images: # table 3
-    rows:
+  messages: # define table named messages
+    columns: # columns of table "messages" come here
+      message: # define column named message
+        value: VarChar # value type of row message is VarChar(String)
+      integervalue:
+        value: NumberI # value type of row id is Integer number
+      floatvalue:
+        value: NumberF # value type of row rating is Floating point number
+  images: # second table
+    columns:
       id:
         value: Number
       image_link:

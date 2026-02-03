@@ -1,6 +1,6 @@
 tables:
   messages:
-    rows:
+    columns:
       id:
         value: NumberI # Integer number value
       message:
