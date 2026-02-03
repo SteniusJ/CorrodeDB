@@ -28,8 +28,9 @@ pub fn escape_split(input: &str, split_char: char) -> Vec<&str> {
 }
 
 /// Removes the / escape character from a string
+/// escapes "
 pub fn remove_escape_characters(input: String) -> String {
-    input.replace("\\", "")
+    input.replace("\\", "").replace("\"", "\\\"")
 }
 
 /// Parses program arguments
