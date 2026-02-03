@@ -8,7 +8,7 @@ pub enum ColValue {
     NumberF,
     VarChar
 }
-
+#[derive(Debug)]
 pub struct DBSettings {
     pub tables: HashMap<String, TableSettings>,
     pub password: String,
@@ -34,10 +34,10 @@ impl DBSettings {
         let doc = &docs[0];
 
         let mut table_map: HashMap<String, TableSettings> = HashMap::new();
-        let mut col_vec: Vec<ColSettings> = Vec::new();
 
         for tables in doc["tables"].as_hash().unwrap().iter().enumerate() {
             let table_name = tables.1.0.as_str().unwrap();
+            let mut col_vec: Vec<ColSettings> = Vec::new();
 
             // Tables have the possibility to hold other data than just what rows they include, but
             // this is currently not used so we skip one and iterate the rows.
