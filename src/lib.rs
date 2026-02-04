@@ -461,33 +461,38 @@ fn read_from_db(db_settings: &meta::DBSettings, file_system: &mut file::FileSyst
             query::IndexType::Wildcard => {
                 let dir_name = format!("./tables/{}", query.table_name);
                 let dir = file_system.read_folder(dir_name.as_str());
+                let mut containers: Vec<u64> = dir.map(|res_dir_entry| 
+                    res_dir_entry.unwrap()
+                        .file_name()
+                        .to_str()
+                        .unwrap()
+                        .parse::<u64>()
+                        .unwrap())
+                    .collect();
+                containers.sort(); // This is necessary to make sure that the indexes in the
+                                   // response are in order. Looping trough ReadDir results in a
+                                   // iterator which is not always in order.
 
-                for file in dir {
-                    match file {
-                        Ok(dir_entry) => {
-                            let container = dir_entry.file_name().into_string().unwrap().parse::<u64>().unwrap();
-                            let file_name = format!("{}/{}", dir_name, container);
-                            match file_system.open(file_name.as_str()) {
-                                Ok(_) => (),
-                                Err(e) if e.kind() == ErrorKind::InvalidInput => (),
-                                Err(e) => {
-                                    println!("File open failed: {e}");
-                                    continue;
-                                },
-                            }
-
-                            match file_system.read_from_cache(file_name.as_str()) {
-                                Ok(contents) => {
-                                    let mut contents_with_index: Vec<(u64, String)> = contents.iter().enumerate().map(|line| (get_index(line.0 as u64, container, db_settings), line.1.clone())).collect();
-                                    result.append(&mut contents_with_index);
-                                },
-                                Err(e) => {
-                                    println!("Read failed: {e}");
-                                    continue;
-                                },
-                            }
+                for container in containers {
+                    let file_name = format!("{}/{}", dir_name, container);
+                    match file_system.open(file_name.as_str()) {
+                        Ok(_) => (),
+                        Err(e) if e.kind() == ErrorKind::InvalidInput => (),
+                        Err(e) => {
+                            println!("File open failed: {e}");
+                            continue;
                         },
-                        Err(_) => (),
+                    }
+
+                    match file_system.read_from_cache(file_name.as_str()) {
+                        Ok(contents) => {
+                            let mut contents_with_index: Vec<(u64, String)> = contents.iter().enumerate().map(|line| (get_index(line.0 as u64, container, db_settings), line.1.clone())).collect();
+                            result.append(&mut contents_with_index);
+                        },
+                        Err(e) => {
+                            println!("Read failed: {e}");
+                            continue;
+                        },
                     }
                 }
             },
