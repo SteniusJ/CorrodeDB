@@ -75,7 +75,7 @@ pub fn data_integrity_check(schema_path: &str) {
                 for (index, line) in file_content.iter().enumerate() {
                     if line.is_empty() {
                         continue;
-                    }
+                    } 
 
                     let columns_data = util::escape_split(line.as_str(), ',');
 
@@ -182,7 +182,7 @@ fn file_read(file_name: &str, file_system: &mut file::FileSystem) -> Result<Vec<
 /// Returns line, function name and database index
 fn get_line_fname_idx(db_settings: &meta::DBSettings, query: &query::QueryResult, index: u64) -> (u64, String, u64) {
     let container = num::integer::div_floor(index, db_settings.compartment_rows as u64);
-    let line = if index < db_settings.compartment_rows as u64 {index} else {index - db_settings.compartment_rows as u64};
+    let line = if index < db_settings.compartment_rows as u64 {index} else {index - (db_settings.compartment_rows as u64 * container)};
     let file_name = format!("./tables/{}/{}", query.table_name, container);
     let index = get_index(line, container, db_settings);
 
