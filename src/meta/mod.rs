@@ -157,7 +157,7 @@ pub fn load_meta(meta_file_path: &str) -> DBSettings {
             Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => {
                 let last_file_name = {
                     let mut highest_file: u32 = 0;
-                    for dir_entry in file_system.read_folder(format!("./tables/{table_name}").as_str()) {
+                    for dir_entry in file_system.read_folder(format!("./tables/{table_name}").as_str()).unwrap() {
                         let dir_entry = dir_entry.unwrap();
                         let fname = dir_entry.file_name().into_string().unwrap().parse::<u32>().unwrap();
                         if highest_file < fname {

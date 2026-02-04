@@ -15,6 +15,7 @@ const DEFAULT_PORT: &str = "4067";
 pub struct ProgramArgs {
     pub schema_path: String,
     pub port: String,
+    pub data_integrity_check: bool,
 }
 
 /// Loads program arguments
@@ -22,6 +23,7 @@ pub fn load_program_arguments() -> ProgramArgs {
     let mut program_args = ProgramArgs {
         schema_path: String::from(DEFAULT_SCHEMA_FILE_PATH),
         port: String::from(DEFAULT_PORT),
+        data_integrity_check: false,
     };
 
     // Read program arguments
@@ -35,6 +37,13 @@ pub fn load_program_arguments() -> ProgramArgs {
             "-p" => {
                 program_args.port = value;
             },
+            "-di" => {
+                if value == "true" {
+                    program_args.data_integrity_check = true;
+                } else {
+                    println!("data integrity has to be called with the value 'true' to have any effect");
+                }
+            },
             f=> {
                 println!("flag {f} is not a valid flag");
             },
@@ -42,6 +51,65 @@ pub fn load_program_arguments() -> ProgramArgs {
     }
 
     program_args
+}
+
+/// Utility function for checking integrity of database data
+pub fn data_integrity_check(schema_path: &str) {
+    let mut file_system = file::FileSystem::new();
+    let db_settings = meta::load_meta(schema_path);
+
+    println!("--------------- Starting data integrity check ---------------\n");
+    for (table, table_settings) in db_settings.tables {
+        println!("Checking data for table: {table}");
+
+        let dir_path = format!("./tables/{table}");
+        let Ok(dir) = file_system.read_folder(dir_path.as_str()) else {
+            panic!("table '{table}' does not have a folder");
+        };
+
+        for file in dir {
+            let file = file.unwrap();
+            let file_name = file.file_name().into_string().unwrap();
+
+            if let Ok(file_content) = file_read(format!("./tables/{table}/{file_name}").as_str(), &mut file_system) {
+                for (index, line) in file_content.iter().enumerate() {
+                    if line.is_empty() {
+                        continue;
+                    }
+
+                    let columns_data = util::escape_split(line.as_str(), ',');
+
+                    if columns_data.len() != table_settings.columns.len() {
+                        println!("! {table}: {file_name} - error on line {} - number of columns does not match!", index + 1);
+                    }
+
+                    for (column_index, column_data) in columns_data.iter().enumerate() {
+                        if column_index >= table_settings.columns.len() {
+                            break;
+                        }
+
+                        match table_settings.columns[column_index].value {
+                            meta::ColValue::NumberI => {
+                                if column_data.parse::<i64>().is_err() {
+                                    println!("! {table}: {file_name} - error on line {} - datatype does not match, expected NumberI for column {column_index}!", index + 1);
+                                }
+                            },
+                            meta::ColValue::NumberF => {
+                                if column_data.parse::<f64>().is_err() {
+                                    println!("! {table}: {file_name} - error on line {} - datatype does not match, expected NumberF for column {column_index}!", index + 1);
+                                }
+                            },
+                            meta::ColValue::VarChar => (),
+                        }
+                    }
+                }
+            } else {
+                panic!("failed to read file {file_name}");
+            } 
+        }
+
+        println!("Finished checking data for table: {table}\n");
+    }
 }
 
 /// Starts database server
