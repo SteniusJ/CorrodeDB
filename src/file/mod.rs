@@ -6,7 +6,7 @@ use std::fs::{
 use std::path::Path;
 use std::io::prelude::*;
 use std::collections::HashMap;
-use std::io::Result;
+use std::io::{Result, Error, ErrorKind};
 
 #[derive(Debug)]
 pub enum Status {
@@ -33,7 +33,7 @@ impl FileSystem {
     /// If file doesn't exist it is created
     pub fn open(&mut self, file_name: &str) -> Result<Status> {
         if self.is_in_cache(file_name) {
-            return Err(std::io::Error::new(std::io::ErrorKind::InvalidInput, "File already in cache"));
+            return Err(Error::new(ErrorKind::InvalidInput, "File already in cache"));
         }
 
         let mut file: File;
@@ -62,7 +62,7 @@ impl FileSystem {
     /// Overwrites Current data in cache with the new
     pub fn write_to_cache(&mut self, file_name: &str, new_content: String) -> Result<Status> {
         if !self.is_in_cache(file_name) {
-            return Err(std::io::Error::new(std::io::ErrorKind::NotFound, "File not in cache"))
+            return Err(Error::new(ErrorKind::NotFound, "File not in cache"))
         }
 
         self.add_to_cache(file_name.to_string(), new_content.lines().map(String::from).collect());
@@ -73,13 +73,11 @@ impl FileSystem {
     /// Returns file data from cache as a String
     /// Returns error if file does not exist in cache
     pub fn read_from_cache(&mut self, file_name: &str) -> Result<Vec<String>> {
-        if !self.is_in_cache(file_name) {
-            return Err(std::io::Error::new(std::io::ErrorKind::NotFound, "File not in cache"))
-        }
+        let Some(contents) = self.cache.get(file_name) else {
+            return Err(Error::new(ErrorKind::NotFound, "File not found in cache"));
+        };
 
-        let contents = self.cache.get(file_name).unwrap().clone();
-
-        Ok(contents)
+        Ok(contents.clone())
     }
 
     /// Returns data from given line
@@ -93,7 +91,7 @@ impl FileSystem {
                     let line_string = file_contents[line].clone();
                     return Ok(line_string);
                 }
-                return Err(std::io::Error::new(std::io::ErrorKind::NotFound, "Line number outside file size"))
+                return Err(Error::new(ErrorKind::NotFound, "Line number outside file size"))
             },
             Err(e) => {
                 return Err(e);
@@ -103,10 +101,6 @@ impl FileSystem {
 
     /// Writes data for specified file from the cache to long term memory
     pub fn write_cache_to_disk(&mut self, file_name: &str) -> Result<Status> {
-        if !self.is_in_cache(file_name) {
-            return Err(std::io::Error::new(std::io::ErrorKind::NotFound, "File not in cache"))
-        }
-
         let mut file: File;
 
         match File::create(file_name) {
@@ -114,16 +108,19 @@ impl FileSystem {
             Err(e) => return Err(e),
         }
 
-        let contents = self.cache.get(file_name).unwrap().clone().join("\n");
+        if let Some(contents) = self.cache.get(file_name) {
+            let contents = contents.clone().join("\n");
+            match file.write_all(contents.as_bytes()) {
+                Ok(_) => {
+                    self.cache.remove(file_name);
+                    self.cache.shrink_to_fit();
 
-        match file.write_all(contents.as_bytes()) {
-            Ok(_) => {
-                self.cache.remove(file_name);
-                self.cache.shrink_to_fit();
-
-                return Ok(Status::Success)
-            },
-            Err(e) => return Err(e),
+                    return Ok(Status::Success)
+                },
+                Err(e) => return Err(e),
+            }
+        } else {
+            return Err(Error::new(ErrorKind::NotFound, "File not found in cache"));
         }
     }
 
@@ -159,7 +156,7 @@ impl FileSystem {
         let path = Path::new(dir_name);
 
         if path.exists() && path.is_dir() {
-            return Err(std::io::Error::new(std::io::ErrorKind::AlreadyExists, "Dir already exists"));
+            return Err(Error::new(ErrorKind::AlreadyExists, "Dir already exists"));
         }
 
         let mut builder = DirBuilder::new();
@@ -171,9 +168,12 @@ impl FileSystem {
         }
     }
 
-    pub fn read_folder(&self, dir_name: &str) -> ReadDir {
+    pub fn read_folder(&self, dir_name: &str) -> Result<ReadDir> {
         let path = Path::new(dir_name);
-        path.read_dir().unwrap()
+        match path.read_dir() {
+            Ok(read_dir) => Ok(read_dir),
+            Err(e) => Err(e),
+        }
     }
 
     /// Removes entry from cache and frees memory
@@ -181,7 +181,7 @@ impl FileSystem {
     /// Should be used when file contents are no longer needed but no write to disk is necessary
     pub fn drop_from_cache(&mut self, file_name: &str) -> Result<Status> {
         if !self.is_in_cache(file_name) {
-            return Err(std::io::Error::new(std::io::ErrorKind::NotFound, "File not in cache"))
+            return Err(Error::new(ErrorKind::NotFound, "File not in cache"))
         }
 
         self.cache.remove(file_name);

@@ -55,7 +55,10 @@ impl<'a> HTTPServer<'a> {
         println!("http server listening on: {}", self.address.as_str());
 
         for stream in listener.incoming() {
-            let mut stream = stream.unwrap();
+            let Ok(mut stream) = stream else {
+                println!("Broken stream!");
+                continue;
+            };
             let mut buf_reader = BufReader::new(&mut stream);
 
             let mut request_header = parse_http_request_header(&mut buf_reader);
@@ -79,7 +82,10 @@ impl<'a> HTTPServer<'a> {
                 };
             }
 
-            stream.write_all(res.as_bytes()).unwrap();
+            match stream.write_all(res.as_bytes()) {
+                Ok(_) => (),
+                Err(e) => println!("Stream write failed!\n{e}"),
+            }
         }
     }
 }
@@ -91,7 +97,7 @@ pub fn create_http_response(status_code: u16, content_type: &str, content: &str)
 
 /// Creates tcp listener for give address
 fn create_tcp_listener(address: &str) -> TcpListener {
-    TcpListener::bind(address).unwrap()
+    TcpListener::bind(address).unwrap() // acceptable as this only happens on application startup
 }
 
 /// Creates HTTPRequestMethods struct from method string
@@ -132,12 +138,21 @@ fn parse_http_request_header(buf_reader: &mut BufReader<&mut TcpStream>) -> HTTP
 
     loop {
         let mut buffer = String::new();
-        let bytes = buf_reader.read_line(&mut buffer).unwrap();
+        let Ok(bytes) = buf_reader.read_line(&mut buffer) else {
+            println!("Buffer read failed!");
+            break;
+        };
 
         if bytes == 0 || buffer.trim().is_empty() {
             let mut body = vec![0; request_header.content_length as usize];
             if request_header.content_length > 0 {
-                buf_reader.read_exact(&mut body).unwrap();
+                match buf_reader.read_exact(&mut body) {
+                    Ok(_) => (),
+                    Err(e) => {
+                        println!("Http request body read failed!\n{e}");
+                        break;
+                    },
+                }
             }
             request_header.content = String::from_utf8_lossy(&body).to_string();
             break;
@@ -148,9 +163,9 @@ fn parse_http_request_header(buf_reader: &mut BufReader<&mut TcpStream>) -> HTTP
         if line_split.len() == 1 {
             let line_split: Vec<&str> = buffer.split_whitespace().collect();
 
-            request_header.method = parse_http_method(line_split.get(0).unwrap());
+            request_header.method = parse_http_method(line_split.get(0).unwrap_or(&""));
 
-            let url_contents: Vec<&str> = line_split.get(1).unwrap().split("?").collect();
+            let url_contents: Vec<&str> = line_split.get(1).unwrap_or(&"").split("?").collect();
             request_header.endpoint = url_contents[0].to_string();
 
             if url_contents.len() > 1 {
@@ -178,8 +193,8 @@ fn parse_http_request_header(buf_reader: &mut BufReader<&mut TcpStream>) -> HTTP
         }
 
         match line_split.get(0).unwrap().to_lowercase().as_str() {
-            "content-type" => request_header.content_type = line_split.get(1).unwrap().to_string(),
-            "content-length" => request_header.content_length = line_split.get(1).unwrap().parse().unwrap(),
+            "content-type" => request_header.content_type = line_split.get(1).unwrap_or(&"").to_string(),
+            "content-length" => request_header.content_length = line_split.get(1).unwrap_or(&"").parse().unwrap_or(0),
             _ => (),
         }
     }

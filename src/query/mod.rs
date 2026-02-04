@@ -1,5 +1,5 @@
 use regex::Regex;
-use std::io::Result;
+use std::io::{Result, Error, ErrorKind};
 use std::fmt;
 
 #[derive(Debug, PartialEq)]
@@ -27,7 +27,7 @@ pub fn parse_query(query_str: &str) -> Result<QueryResult> {
     let re = Regex::new(r"(?<table_name>[[:alnum:]]*)\[(?<index>[[:digit:],.*]*)\] ?(?<function_name>[[:alnum:]]*) ?(?<function_params>[[:ascii:]]*)\)?").unwrap();
 
     let Some(captures) = re.captures(query_str) else {
-        return Err(std::io::Error::new(std::io::ErrorKind::NotFound, "No captures found"));
+        return Err(Error::new(ErrorKind::NotFound, "No captures found"));
     };
 
     let mut indexes: Vec<IndexType> = Vec::new();
@@ -42,11 +42,11 @@ pub fn parse_query(query_str: &str) -> Result<QueryResult> {
             let range_re = Regex::new(r"(?<start_index>[[:digit:]]*)\.\.(?<end_index>[[:digit:]]*)").unwrap();
             match range_re.captures(index_str) {
                 Some(captures) => {
-                    let start_index = captures["start_index"].parse::<u64>().unwrap();
+                    let start_index = captures["start_index"].parse::<u64>().unwrap(); // safe to assume capture is digit as regex statment makes sure of that
                     let end_index = captures["end_index"].parse::<u64>().unwrap();
 
                     if start_index >= end_index {
-                        return Err(std::io::Error::new(std::io::ErrorKind::Other, "Range not possible"));
+                        return Err(Error::new(ErrorKind::Other, "Range not possible"));
                     }
 
                     for index in start_index..=end_index {
@@ -56,13 +56,13 @@ pub fn parse_query(query_str: &str) -> Result<QueryResult> {
                 },
                 None => {
                     if index_str.parse::<u64>().is_err() {
-                        return Err(std::io::Error::new(std::io::ErrorKind::Other, "Range syntax incorrect"));
+                        return Err(Error::new(ErrorKind::Other, "Range syntax incorrect"));
                     }
                 },
             }
         }
 
-        indexes.push(IndexType::Index(index_str.parse().unwrap()))
+        indexes.push(IndexType::Index(index_str.parse().unwrap())) // safe to assume capture is digit as regex statment makes sure of that
     }
 
     Ok(QueryResult {

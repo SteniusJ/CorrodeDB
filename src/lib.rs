@@ -59,7 +59,7 @@ pub fn start_database(schema_path: &str, port: &str) {
             return (false, "Password url parameter required".to_string());
         }
  
-        if url_params.get("password").unwrap() == &db_password {
+        if url_params.get("password").unwrap() == &db_password { // safe to assume value is Some
             return (true, String::new());
         }
         (false, "Given password is incorrect".to_string())
@@ -297,7 +297,9 @@ fn where_from_db(db_settings: &mut meta::DBSettings, file_system: &mut file::Fil
             },
             query::IndexType::Wildcard => {
                 let dir_name = format!("./tables/{}", query.table_name);
-                let dir = file_system.read_folder(dir_name.as_str());
+                let Ok(dir) = file_system.read_folder(dir_name.as_str()) else {
+                    panic!("Critical failiure! table '{}' does not have a folder", query.table_name);
+                };
                 let (column_index, column) = db_settings.tables.get(&query.table_name).unwrap().get_column(column.to_string()).unwrap();
 
                 for file in dir {
@@ -460,7 +462,9 @@ fn read_from_db(db_settings: &meta::DBSettings, file_system: &mut file::FileSyst
             },
             query::IndexType::Wildcard => {
                 let dir_name = format!("./tables/{}", query.table_name);
-                let dir = file_system.read_folder(dir_name.as_str());
+                let Ok(dir) = file_system.read_folder(dir_name.as_str()) else {
+                    panic!("Critical failiure! Table '{}' does not have a folder", query.table_name);
+                };
                 let mut containers: Vec<u64> = dir.map(|res_dir_entry| 
                     res_dir_entry.unwrap()
                         .file_name()
@@ -581,7 +585,7 @@ fn write_to_db(db_settings: &mut meta::DBSettings, file_system: &mut file::FileS
 
 /// Encodes returned data from file read into a json string
 fn encode_db_return(vec: Vec<(u64, String)>, db_settings: &meta::DBSettings, query: &query::QueryResult) -> String {
-    let db_cols = &db_settings.tables.get(query.table_name.as_str()).unwrap().columns;
+    let db_cols = &db_settings.tables.get(&query.table_name).unwrap().columns;
     let mut json_array: Vec<json::JSONValue> = Vec::new();
 
     for data_row in vec {
