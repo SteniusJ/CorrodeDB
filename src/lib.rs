@@ -155,6 +155,7 @@ pub fn start_database(schema_path: &str, port: &str) {
 
         match db_engine.query(&query) {
             Ok(result) => return http::create_http_response(200, "application/json",  encode_db_return(result).as_str()),
+            Err(e) if e.kind() == std::io::ErrorKind::Other => return http::create_http_response(200, "application/json",  json::encode(vec![("status", json::JSONValue::String(format!("{e}")))]).as_str()),
             Err(e) => return http::create_http_response(400, "application/json",  json::encode(vec![("error", json::JSONValue::String(format!("{e}")))]).as_str()),
         }
     });
