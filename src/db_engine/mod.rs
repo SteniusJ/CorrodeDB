@@ -205,7 +205,7 @@ fn load_functions() -> HashMap<String, DBFunction> {
                     } else {
                         0
                     };
-                    let (_line, file_name, _index) = util::get_line_fname_idx(db_settings, query, table_max_index);
+                    let (_line, file_name, index) = util::get_line_fname_idx(db_settings, query, table_max_index);
 
                     let Ok(mut file_data) = util::file_read(file_name.as_str(), file_system) else {
                         return Err(Error::new(ErrorKind::Other, "File read error"));
@@ -215,7 +215,7 @@ fn load_functions() -> HashMap<String, DBFunction> {
 
                     if util::file_write(file_name.as_str(), file_data, file_system) {
                         db_settings.iterate_id(&query.table_name);
-                        return Ok(String::from("Write success"));
+                        return Ok(format!("Write success, new index: {index}"));
                     } else {
                         return Err(Error::new(ErrorKind::InvalidInput, "Write failed"));
                     }
