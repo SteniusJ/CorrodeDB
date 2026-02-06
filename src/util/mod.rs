@@ -140,3 +140,19 @@ pub fn parse_db_line(line: String, index: u64, col_settings: &Vec<meta::ColSetti
 
     row_content
 }
+
+pub fn db_result_prettify(result: Vec<HashMap<String, db_engine::DBDatatype>>) -> String {
+    let mut pretty_string = String::new();
+
+    for row_data in result {
+        pretty_string.push_str("{\n");
+        
+        for (col_name, col_data) in row_data {
+            let col_string = format!("  {col_name}: {col_data:?}\n");
+            pretty_string.push_str(&col_string);
+        }
+        pretty_string.push_str("}\n");
+    }
+
+    pretty_string
+}

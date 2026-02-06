@@ -180,7 +180,7 @@ pub fn start_databese_console_queries_mode(schema_path: &str) {
         };
 
         match db_engine.query(&query) {
-            Ok(result) => println!("{result:?}"),
+            Ok(result) => println!("{}", util::db_result_prettify(result)),
             Err(e) => println!("{e}"),
         }
     }
