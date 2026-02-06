@@ -8,6 +8,7 @@ mod db_engine;
 
 use std::env;
 use std::collections::HashMap;
+use std::io::stdin;
 
 const DEFAULT_SCHEMA_FILE_PATH: &str = "./schema.yaml";
 const DEFAULT_PORT: &str = "4067";
@@ -16,6 +17,7 @@ pub struct ProgramArgs {
     pub schema_path: String,
     pub port: String,
     pub data_integrity_check: bool,
+    pub console_queries: bool,
 }
 
 /// Loads program arguments
@@ -24,6 +26,7 @@ pub fn load_program_arguments() -> ProgramArgs {
         schema_path: String::from(DEFAULT_SCHEMA_FILE_PATH),
         port: String::from(DEFAULT_PORT),
         data_integrity_check: false,
+        console_queries: false,
     };
 
     // Read program arguments
@@ -42,6 +45,13 @@ pub fn load_program_arguments() -> ProgramArgs {
                     program_args.data_integrity_check = true;
                 } else {
                     println!("data integrity has to be called with the value 'true' to have any effect");
+                }
+            },
+            "-cq" => {
+                if value == "true" {
+                    program_args.console_queries = true;
+                } else {
+                    println!("console queries has to be called with the value 'true' to have any effect");
                 }
             },
             f=> {
@@ -150,6 +160,30 @@ pub fn start_database(schema_path: &str, port: &str) {
     });
 
     http_server.listen();
+}
+
+pub fn start_databese_console_queries_mode(schema_path: &str) {
+    let mut db_engine = db_engine::DBEngine::new(schema_path);
+
+    println!("database has been started in console queries mode!\n");
+
+    loop {
+        let mut query = String::new();
+        stdin().read_line(&mut query).unwrap();
+
+        let query = match query::parse_query(&query) {
+            Ok(query) => query,
+            Err(e) => {
+                println!("{e}");
+                continue;
+            },
+        };
+
+        match db_engine.query(&query) {
+            Ok(result) => println!("{result:?}"),
+            Err(e) => println!("{e}"),
+        }
+    }
 }
 
 /// Encodes returned data from file read into a json string
