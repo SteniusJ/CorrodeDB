@@ -187,7 +187,11 @@ fn load_functions() -> HashMap<String, DBFunction> {
                         return Err(Error::new(ErrorKind::Other, "File read error"));
                     };
 
-                    file_data.insert(line as usize, query.fn_param.clone());
+                    if file_data.len() > line as usize {
+                        file_data[line as usize] = query.fn_param.clone();
+                    } else {
+                        return Err(Error::new(ErrorKind::Other, "Attempting to write outside index bounds"));
+                    }
 
                     if util::file_write(file_name.as_str(), file_data, file_system) {
                         return Ok(format!("Write to index: {index} succeeded"));

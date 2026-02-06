@@ -2,25 +2,13 @@ tables:
   messages:
     columns:
       id:
-        value: NumberI # Integer number value
-      message:
-        value: VarChar
-      time_posted:
-        value: NumberI
-  reactions:
-    rows:
-      id:
-        value: NumberI
-      reaction:
         value: VarChar
   images:
     rows:
       id:
         value: NumberI
-      image_link:
-        value: VarChar
 
 settings:
   compartment:
-    rows: 50 # Amount of rows per db compartment
+    rows: 25 # Amount of rows per db compartment
   password: Thisisastring1
