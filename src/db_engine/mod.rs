@@ -38,7 +38,6 @@ impl DBEngine {
             return Err(Error::new(ErrorKind::NotFound, "Table doesn't exist'"));
         }
 
-        println!("{:?}", self.functions);
         let Some(main_function) = self.functions.get(&query.fn_name) else {
             return Err(Error::new(ErrorKind::NotFound, "Function not found"));
         };
@@ -83,7 +82,9 @@ fn load_functions() -> HashMap<String, DBFunction> {
                         let (line, file_name, index) = util::get_line_fname_idx(db_settings, query, *i);
 
                         match util::read_line(file_name.as_str(), file_system, line) {
-                            Ok(content) => result.push(util::parse_db_line(content, index, &col_settings)),
+                            Ok(content) => {
+                                result.push(util::parse_db_line(content, index, &col_settings));
+                            }
                             Err(e) if e.kind() == ErrorKind::Other => (),
                             Err(_) => {
                                 return Err(Error::new(ErrorKind::Other, "Index out of table range"));
@@ -104,8 +105,8 @@ fn load_functions() -> HashMap<String, DBFunction> {
                                 .unwrap())
                             .collect();
                         containers.sort(); // This is necessary to make sure that the indexes in the
-                                        // response are in order. Looping trough ReadDir yields in a
-                                        // iterator which is not always in order.
+                                           // response are in order. Looping trough ReadDir yields in a
+                                           // iterator which is not always in order.
 
                         for container in containers {
                             let file_name = format!("{}/{}", dir_name, container);
@@ -121,7 +122,9 @@ fn load_functions() -> HashMap<String, DBFunction> {
                             match file_system.read_from_cache(file_name.as_str()) {
                                 Ok(contents) => {
                                     for (line_index, content) in contents.iter().enumerate() {
-                                        result.push(util::parse_db_line(content.clone(), util::get_index(line_index as u64, container, db_settings), &col_settings));
+                                        if !content.is_empty() {
+                                            result.push(util::parse_db_line(content.clone(), util::get_index(line_index as u64, container, db_settings), &col_settings));
+                                        }
                                     }
                                 },
                                 Err(e) => {
@@ -267,9 +270,14 @@ fn load_functions() -> HashMap<String, DBFunction> {
                         return Err(Error::new(ErrorKind::InvalidInput, "Attempting to retrieve more values than the given query includes"));
                     }
 
-                    let mut indexes: Vec<u64> = (0..=query.indexes.len() as u64).collect();
+                    let mut indexes: Vec<u64> = Vec::new();
+                    for index in &query.indexes {
+                        if let query::IndexType::Index(i) = index {
+                            indexes.push(*i);
+                        }
+                    }
+
                     indexes.shuffle(&mut rng);
-                    indexes.truncate(nr_of_random_values as usize);
 
                     let mut result: Vec<HashMap<String, DBDatatype>> = Vec::new();
 
@@ -277,16 +285,24 @@ fn load_functions() -> HashMap<String, DBFunction> {
                         let (line, file_name, index) = util::get_line_fname_idx(db_settings, query, index);
 
                         match util::read_line(file_name.as_str(), file_system, line) {
-                            Ok(content) => result.push(util::parse_db_line(content, index, &col_settings)),
+                            Ok(content) => {
+                                if content.is_empty() {
+                                    return Err(Error::new(ErrorKind::NotFound, "Line is empty"));
+                                }
+                                result.push(util::parse_db_line(content, index, &col_settings));
+                            }
                             Err(e) if e.kind() == ErrorKind::Other => (),
                             Err(_) => {
                                 return Err(Error::new(ErrorKind::Other, "Index out of table range"));
                             }
                         };
-                    }
 
-                    file_system.drop_entire_cache();
-                    return Ok(result);
+                        if result.len() >= nr_of_random_values as usize{
+                            file_system.drop_entire_cache();
+                            return Ok(result);
+                        }
+                    }
+                    return Err(Error::new(ErrorKind::InvalidInput, "Attempting to retrieve more values than the table includes"));
                 },
                 query::IndexType::Wildcard => {
                     if biggest_id + 1 < nr_of_random_values {
@@ -302,7 +318,11 @@ fn load_functions() -> HashMap<String, DBFunction> {
                         let (line, file_name, index) = util::get_line_fname_idx(db_settings, query, i);
 
                         match util::read_line(file_name.as_str(), file_system, line) {
-                            Ok(content) => result.push(util::parse_db_line(content, index, &col_settings)),
+                            Ok(content) => {
+                                if !content.is_empty() {
+                                    result.push(util::parse_db_line(content, index, &col_settings));
+                                }
+                            }
                             Err(e) if e.kind() == ErrorKind::Other => (),
                             Err(_) => {
                                 return Err(Error::new(ErrorKind::Other, "Index out of table range"));

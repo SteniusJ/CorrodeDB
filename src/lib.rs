@@ -117,20 +117,19 @@ pub fn start_database(schema_path: &str, port: &str) {
     // Order of definition is critical,
     // variables used inside endpoints of the http_server
     // need to be defined before the server itself
-    let db_settings = meta::load_meta(schema_path); // shouldn't be needed here
     let mut db_engine = db_engine::DBEngine::new(schema_path);
-    let db_password = db_settings.password.clone(); // make some new way to get db_password maybe util function?
+    let db_password = meta::get_password(schema_path);
     let mut http_server = http::HTTPServer::new(format!("127.0.0.1:{port}"));
 
     http_server.add_middleware(|_body, url_params| {
-        if !url_params.contains_key("password") {
-            return (false, "Password url parameter required".to_string());
+        if let Some(password) = url_params.get("password") {
+            if password == &db_password {
+                return (true, String::new());
+            }
+            return (false, String::from("Password is incorrect"));
+        } else {
+            return (false, String::from("Password url parameter is required"));
         }
- 
-        if url_params.get("password").unwrap() == &db_password { // safe to assume value is Some
-            return (true, String::new());
-        }
-        (false, "Given password is incorrect".to_string())
     });
 
     http_server.add_endpoint("/", http::HTTPRequestMethods::POST, |body, _url_params| {
@@ -146,7 +145,7 @@ pub fn start_database(schema_path: &str, port: &str) {
 
         match db_engine.query(&query) {
             Ok(result) => return http::create_http_response(200, "application/json",  encode_db_return(result).as_str()),
-            Err(_) => return http::create_http_response(400, "application/json",  json::encode(vec![("error", json::JSONValue::String("Generic error".to_string()))]).as_str()),
+            Err(e) => return http::create_http_response(400, "application/json",  json::encode(vec![("error", json::JSONValue::String(format!("{e}")))]).as_str()),
         }
     });
 
@@ -157,13 +156,11 @@ pub fn start_database(schema_path: &str, port: &str) {
 fn encode_db_return(vec: Vec<HashMap<String, db_engine::DBDatatype>>) -> String {
     let mut json_array: Vec<json::JSONValue> = Vec::new();
 
-    for data_row in vec {
-        /*
-        if data_row.1.is_empty() {
-            continue;
-        }
-        */
+    if vec.is_empty() {
+        return json::encode(vec![("error", json::JSONValue::String(String::from("return is empty")))]);
+    }
 
+    for data_row in vec {
         let mut json_object: Vec<(String, json::JSONValue)> = Vec::new();
 
         for (col_name, content) in data_row {
@@ -174,23 +171,6 @@ fn encode_db_return(vec: Vec<HashMap<String, db_engine::DBDatatype>>) -> String 
             }
         }
 
-        /*
-        for data in util::escape_split(data_row.1.as_str(), ',').iter().enumerate() {
-            let col_data = &db_cols[data.0];
-
-            match col_data.value {
-                meta::ColValue::NumberI => {
-                    json_object.push((col_data.name.clone(), json::JSONValue::NumI(data.1.parse().unwrap())));
-                },
-                meta::ColValue::NumberF => {
-                    json_object.push((col_data.name.clone(), json::JSONValue::NumF(data.1.parse().unwrap())));
-                },
-                meta::ColValue::VarChar => {
-                    json_object.push((col_data.name.clone(), json::JSONValue::String(util::remove_escape_characters(data.1.to_string()))));
-                },
-            }
-        }
-        */
         json_array.push(json::JSONValue::Object(json_object));
     }
 

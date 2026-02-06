@@ -1,4 +1,4 @@
-use CorrodeDB::{start_database, load_program_arguments, data_integrity_check};
+use corrode_db::{start_database, load_program_arguments, data_integrity_check};
 
 fn main() {
     let program_args = load_program_arguments();

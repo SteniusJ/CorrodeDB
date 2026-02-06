@@ -11,7 +11,6 @@ pub enum ColValue {
 #[derive(Debug)]
 pub struct DBSettings {
     pub tables: HashMap<String, TableSettings>,
-    pub password: String,
     pub compartment_rows: i16,
 }
 
@@ -85,7 +84,6 @@ impl DBSettings {
 
         DBSettings {
             tables: table_map,
-            password: doc["settings"]["password"].as_str().unwrap().to_string(),
             compartment_rows: doc["settings"]["compartment"]["rows"].as_i64().unwrap() as i16,
         }
     }
@@ -191,4 +189,30 @@ pub fn load_meta(meta_file_path: &str) -> DBSettings {
 
     println!("--------- db setup finished ---------\n");
     db_settings
+}
+
+pub fn get_password(meta_file_path: &str) -> String {
+    let mut file_system = crate::file::FileSystem::new();
+
+    match file_system.open(meta_file_path) {
+        Ok(_) => (),
+        Err(e) => panic!("Schema file open failed: {e:?}"),
+    }
+
+    let test_config_yaml = match file_system.read_from_cache(meta_file_path) {
+        Ok(contents) => {
+            contents.join("\n")
+        },
+        Err(e) => panic!("Schema file read failed: {e:?}"),
+    };
+
+    match file_system.drop_from_cache(meta_file_path) {
+        Ok(_) => (),
+        Err(e) => println!("Schema file drop failed: {e:?}"),
+    }
+
+    let docs = YamlLoader::load_from_str(test_config_yaml.as_str()).unwrap();
+    let doc = &docs[0];
+
+    doc["settings"]["password"].as_str().unwrap().to_string()
 }
