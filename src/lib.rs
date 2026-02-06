@@ -170,6 +170,7 @@ pub fn start_databese_console_queries_mode(schema_path: &str) {
     loop {
         let mut query = String::new();
         stdin().read_line(&mut query).unwrap();
+        query = query.trim().to_string();
 
         let query = match query::parse_query(&query) {
             Ok(query) => query,
