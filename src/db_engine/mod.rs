@@ -172,15 +172,15 @@ fn load_functions() -> HashMap<String, DBFunction> {
                 return Err(Error::new(ErrorKind::InvalidInput, "Data can only be written to one index at a time"));
             }
 
-            let row_data_split = util::escape_split(query.fn_param.as_str(), ',');
+            let write_data = &query.fn_params;
             let columns = &db_settings.tables.get(&query.table_name).unwrap().columns;
 
-            if row_data_split.len() != columns.len() {
+            if write_data.len() != columns.len() {
                 return Err(Error::new(ErrorKind::InvalidInput, "The number of arguments does not match the number of data columns in the table"));
             }
 
             // Check if given data matches column data types
-            for row_data in row_data_split.iter().enumerate() {
+            for row_data in write_data.iter().enumerate() {
                 let col_data = &columns[row_data.0];
 
                 match col_data.value {
@@ -209,7 +209,7 @@ fn load_functions() -> HashMap<String, DBFunction> {
                     };
 
                     if file_data.len() > line as usize {
-                        file_data[line as usize] = query.fn_param.clone();
+                        file_data[line as usize] = query.fn_params.join(",");
                     } else {
                         return Err(Error::new(ErrorKind::Other, "Attempting to write outside index bounds"));
                     }
@@ -232,7 +232,7 @@ fn load_functions() -> HashMap<String, DBFunction> {
                         return Err(Error::new(ErrorKind::Other, "File read error"));
                     };
 
-                    file_data.push(query.fn_param.clone());
+                    file_data.push(query.fn_params.join(","));
 
                     if util::file_write(file_name.as_str(), file_data, file_system) {
                         db_settings.iterate_id(&query.table_name);
@@ -282,8 +282,12 @@ fn load_functions() -> HashMap<String, DBFunction> {
         ///
         /// Returns random values from database
         fn random_from_db(db_settings: &mut meta::DBSettings, file_system: &mut file::FileSystem, query: &query::QueryResult) -> Result<Vec<HashMap<String, DBDatatype>>> {
+            if query.fn_params.len() != 1 {
+                return Err(Error::new(ErrorKind::InvalidInput, "Random accepts 1 parameter"));
+            }
+
             let mut rng = rand::rng();
-            let Ok(nr_of_random_values) = query.fn_param.parse::<u64>() else {
+            let Ok(nr_of_random_values) = query.fn_params[0].parse::<u64>() else {
                 return Err(Error::new(ErrorKind::InvalidInput, "Incorrect parameter type for random function"));
             };
             let biggest_id = db_settings.tables.get(&query.table_name).unwrap().biggest_id;
@@ -372,7 +376,7 @@ fn load_functions() -> HashMap<String, DBFunction> {
         /// Returns data which matches condition
         fn where_from_db(db_settings: &mut meta::DBSettings, file_system: &mut file::FileSystem, query: &query::QueryResult) -> Result<Vec<HashMap<String, DBDatatype>>> {
             let mut result: Vec<HashMap<String, DBDatatype>> = Vec::new();
-            let mut arguments = util::escape_split(query.fn_param.as_str(), ',').into_iter();
+            let mut arguments = query.fn_params.clone().into_iter();
 
             // Assign variables necessary for conditon matching
             let column = {
@@ -484,7 +488,7 @@ fn load_functions() -> HashMap<String, DBFunction> {
 
                                     let column_content = util::escape_split(content.as_str(), ',')[column_index];
 
-                                    match is_matching(&column.value, column_content, value, operator) {
+                                    match is_matching(&column.value, &column_content, &value, &operator) {
                                         Ok(b) => {
                                             if b {
                                                 result.push(util::parse_db_line(content, index, col_settings));
@@ -533,7 +537,7 @@ fn load_functions() -> HashMap<String, DBFunction> {
 
                                                 let column_content = util::escape_split(content.as_str(), ',')[column_index];
 
-                                                match is_matching(&column.value, column_content, value, operator) {
+                                                match is_matching(&column.value, &column_content, &value, &operator) {
                                                     Ok(b) => {
                                                         if b {
                                                             result.push(util::parse_db_line(column_content.to_string(), index, col_settings));
@@ -572,7 +576,7 @@ fn load_sub_functions() -> HashMap<String, DBFunction> {
 
     sub_functions.insert(String::from("sort"), {
         fn sort_by(data: Vec<HashMap<String, DBDatatype>>, query: &query::QueryResult, db_settings: &meta::DBSettings) -> Result<Vec<HashMap<String, DBDatatype>>> {
-            let params: Vec<&str> = query.sub_fn_param.split(',').collect();
+            let params = &query.sub_fn_params;
 
             if params.len() != 2 {
                 return Err(Error::new(ErrorKind::InvalidInput, "sort sub function accepts 2 parameters"));
@@ -582,7 +586,7 @@ fn load_sub_functions() -> HashMap<String, DBFunction> {
                 return Err(Error::new(ErrorKind::InvalidInput, format!("table {} does not have a column called {}", query.table_name, params[0])));
             }
 
-            util::merge_sort(data, params[1], params[0])
+            util::merge_sort(data, &params[1], &params[0])
         }
         DBFunction::Sub(sort_by)
     });

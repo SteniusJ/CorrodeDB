@@ -14,17 +14,17 @@ pub struct QueryResult {
     pub table_name: String,
     pub indexes: Vec<IndexType>,
     pub fn_name: String,
-    pub fn_param: String,
+    pub fn_params: Vec<String>,
     pub sub_fn_name: String,
-    pub sub_fn_param: String,
+    pub sub_fn_params: Vec<String>,
 }
 
 impl fmt::Display for QueryResult {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         if self.sub_fn_name.is_empty() {
-            write!(f, "Query: {}{:?} {} {}", self.table_name, self.indexes, self.fn_name, self.fn_param)
+            write!(f, "Query: {}{:?} {} {:?}", self.table_name, self.indexes, self.fn_name, self.fn_params)
         } else {
-            write!(f, "Query: {}{:?} {} {} | {} {}", self.table_name, self.indexes, self.fn_name, self.fn_param, self.sub_fn_name, self.sub_fn_param)
+            write!(f, "Query: {}{:?} {} {:?} | {} {:?}", self.table_name, self.indexes, self.fn_name, self.fn_params, self.sub_fn_name, self.sub_fn_params)
         }
     }
 }
@@ -74,6 +74,9 @@ pub fn parse_query(query_str: &str) -> Result<QueryResult> {
 
     // Possibly temporary solution until I come up with a better regex
     let param_split = util::escape_split(&captures["function_params"], '|');
+    
+    let fn_params: Vec<String> = util::escape_split(param_split[0].trim(), ',').iter().map(|v| String::from(*v)).collect();
+
     if param_split.len() > 1 {
         let sub_split: Vec<&str> = param_split[1].trim().splitn(2, ' ').collect();
         
@@ -81,13 +84,15 @@ pub fn parse_query(query_str: &str) -> Result<QueryResult> {
             return Err(Error::new(ErrorKind::InvalidInput, "sub functions require parameters"));
         }
 
+        let sub_fn_params: Vec<String> = util::escape_split(sub_split[1].trim(), ',').iter().map(|v| String::from(*v)).collect();
+
         return Ok(QueryResult {
             table_name: captures["table_name"].to_string(),
             indexes: indexes,
             fn_name: captures["function_name"].to_string(),
-            fn_param: param_split[0].trim().to_string(),
+            fn_params: fn_params,
             sub_fn_name: sub_split[0].to_string(),
-            sub_fn_param: sub_split[1].to_string(),
+            sub_fn_params: sub_fn_params,
         });
     }
 
@@ -95,9 +100,9 @@ pub fn parse_query(query_str: &str) -> Result<QueryResult> {
         table_name: captures["table_name"].to_string(),
         indexes: indexes,
         fn_name: captures["function_name"].to_string(),
-        fn_param: captures["function_params"].to_string(),
+        fn_params: fn_params,
         sub_fn_name: String::new(),
-        sub_fn_param: String::new(),
+        sub_fn_params: Vec::new(),
     })
 }
 
