@@ -1,6 +1,7 @@
 use regex::Regex;
 use std::io::{Result, Error, ErrorKind};
 use std::fmt;
+use crate::util;
 
 #[derive(Debug, PartialEq)]
 pub enum IndexType {
@@ -14,11 +15,17 @@ pub struct QueryResult {
     pub indexes: Vec<IndexType>,
     pub fn_name: String,
     pub fn_param: String,
+    pub sub_fn_name: String,
+    pub sub_fn_param: String,
 }
 
 impl fmt::Display for QueryResult {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "Query: {}{:?} {} {}", self.table_name, self.indexes, self.fn_name, self.fn_param)
+        if self.sub_fn_name.is_empty() {
+            write!(f, "Query: {}{:?} {} {}", self.table_name, self.indexes, self.fn_name, self.fn_param)
+        } else {
+            write!(f, "Query: {}{:?} {} {} | {} {}", self.table_name, self.indexes, self.fn_name, self.fn_param, self.sub_fn_name, self.sub_fn_param)
+        }
     }
 }
 
@@ -65,11 +72,32 @@ pub fn parse_query(query_str: &str) -> Result<QueryResult> {
         indexes.push(IndexType::Index(index_str.parse().unwrap())) // safe to assume capture is digit as regex statment makes sure of that
     }
 
+    // Possibly temporary solution until I come up with a better regex
+    let param_split = util::escape_split(&captures["function_params"], '|');
+    if param_split.len() > 1 {
+        let sub_split: Vec<&str> = param_split[1].trim().splitn(2, ' ').collect();
+        
+        if sub_split.len() != 2 {
+            return Err(Error::new(ErrorKind::InvalidInput, "sub functions require parameters"));
+        }
+
+        return Ok(QueryResult {
+            table_name: captures["table_name"].to_string(),
+            indexes: indexes,
+            fn_name: captures["function_name"].to_string(),
+            fn_param: param_split[0].trim().to_string(),
+            sub_fn_name: sub_split[0].to_string(),
+            sub_fn_param: sub_split[1].to_string(),
+        });
+    }
+
     Ok(QueryResult {
         table_name: captures["table_name"].to_string(),
         indexes: indexes,
         fn_name: captures["function_name"].to_string(),
-        fn_param: captures["function_params"].to_string()
+        fn_param: captures["function_params"].to_string(),
+        sub_fn_name: String::new(),
+        sub_fn_param: String::new(),
     })
 }
 

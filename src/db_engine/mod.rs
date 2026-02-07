@@ -14,7 +14,7 @@ pub enum DBDatatype {
 enum DBFunction {
     Main(fn(&mut meta::DBSettings, &mut file::FileSystem, &query::QueryResult) -> Result<Vec<HashMap<String, DBDatatype>>>),
     MainReturnStatus(fn(&mut meta::DBSettings, &mut file::FileSystem, &query::QueryResult) -> Result<String>),
-    Sub(fn(&mut Vec<HashMap<String, DBDatatype>>) -> Vec<HashMap<String, DBDatatype>>),
+    Sub(fn(Vec<HashMap<String, DBDatatype>>, &query::QueryResult, &meta::DBSettings) -> Result<Vec<HashMap<String, DBDatatype>>>),
 }
 
 pub struct DBEngine {
@@ -52,10 +52,10 @@ impl DBEngine {
             return Err(Error::new(ErrorKind::NotFound, "Function not found"));
         };
 
-        match *main_function {
+        let result = match *main_function {
             DBFunction::Main(func) => {
                 match func(&mut self.db_settings, &mut  self.file_system, &query) {
-                    Ok(result) => return Ok(result),
+                    Ok(result) => result,
                     Err(e) => {
                         return Err(e);
                     },
@@ -72,6 +72,17 @@ impl DBEngine {
                 }
             },
             _ => return Err(Error::new(ErrorKind::Other, "not reachable")),
+        };
+
+        if query.sub_fn_name.is_empty() {
+            return Ok(result);
+        }
+
+        println!("{result:?}");
+        if let Some(DBFunction::Sub(sub_fn)) = self.sub_functions.get(&query.sub_fn_name) {
+            sub_fn(result, &query, &self.db_settings)
+        } else {
+            Err(Error::new(ErrorKind::NotFound, "sub function not found"))
         }
     }
 }
@@ -557,5 +568,24 @@ fn load_functions() -> HashMap<String, DBFunction> {
 }
 
 fn load_sub_functions() -> HashMap<String, DBFunction> {
-    HashMap::new()
+    let mut sub_functions = HashMap::new();
+
+    sub_functions.insert(String::from("sort"), {
+        fn sort_by(data: Vec<HashMap<String, DBDatatype>>, query: &query::QueryResult, db_settings: &meta::DBSettings) -> Result<Vec<HashMap<String, DBDatatype>>> {
+            let params: Vec<&str> = query.sub_fn_param.split(',').collect();
+
+            if params.len() != 2 {
+                return Err(Error::new(ErrorKind::InvalidInput, "sort sub function accepts 2 parameters"));
+            }
+
+            if !db_settings.tables.get(&query.table_name).unwrap().has_column(params[0].to_string()) {
+                return Err(Error::new(ErrorKind::InvalidInput, format!("table {} does not have a column called {}", query.table_name, params[0])));
+            }
+
+            util::merge_sort(data, params[1], params[0])
+        }
+        DBFunction::Sub(sort_by)
+    });
+
+    sub_functions
 }
