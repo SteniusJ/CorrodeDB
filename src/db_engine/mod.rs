@@ -373,14 +373,6 @@ fn load_functions() -> HashMap<String, DBFunction> {
                 if operator.is_empty() {
                     return Err(Error::new(ErrorKind::InvalidInput, "Please give a operator"));
                 }
-                if !match operator {
-                    ">" => true,
-                    "<" => true,
-                    "=" => true,
-                    _ => false,
-                } {
-                    return Err(Error::new(ErrorKind::InvalidInput, format!("{operator} is not a valid operator")));
-                }
                 operator
             };
             let Some(value) = arguments.next() else {
@@ -442,7 +434,18 @@ fn load_functions() -> HashMap<String, DBFunction> {
                         }
                         return Ok(false);
                     },
-                    _ => return Ok(false),
+                    "in" => {
+                        match column_value {
+                            meta::ColValue::VarChar => {
+                                if column_content.contains(match_value) {
+                                    return Ok(true);
+                                }
+                                return Ok(false);
+                            },
+                            _ => return Err(Error::new(ErrorKind::Other, "cannot use in operator on Number value")),
+                        }
+                    }
+                    op => return Err(Error::new(ErrorKind::InvalidInput, format!("{op} is not a valid operator"))),
                 }
             }
 
