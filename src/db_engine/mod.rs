@@ -33,7 +33,17 @@ impl DBEngine {
             sub_functions: load_sub_functions(),
         }
     }
-    pub fn query(&mut self, query: &query::QueryResult) -> Result<Vec<HashMap<String, DBDatatype>>> {
+    pub fn query(&mut self, query: &str) -> Result<Vec<HashMap<String, DBDatatype>>> {
+        let query = match query::parse_query(query) {
+            Ok(query) => query,
+            Err(e) => {
+                println!("Query parse error: {e}");
+                return Err(Error::new(ErrorKind::InvalidInput, "Query parse error"));
+            }
+        };
+
+        println!("{query}");
+
         if !self.db_settings.table_exists(&query.table_name) {
             return Err(Error::new(ErrorKind::NotFound, "Table doesn't exist'"));
         }

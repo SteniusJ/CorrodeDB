@@ -143,17 +143,7 @@ pub fn start_database(schema_path: &str, port: &str) {
     });
 
     http_server.add_endpoint("/", http::HTTPRequestMethods::POST, |body, _url_params| {
-        let query = match query::parse_query(body.as_str()) {
-            Ok(query) => query,
-            Err(e) => {
-                println!("Query parse error: {e}");
-                return http::create_http_response(400, "application/json",  json::encode(vec![("error", json::JSONValue::String("Query could not be parsed".to_string()))]).as_str());
-            }
-        };
-
-        println!("{query}");
-
-        match db_engine.query(&query) {
+        match db_engine.query(&body) {
             Ok(result) => return http::create_http_response(200, "application/json",  encode_db_return(result).as_str()),
             Err(e) if e.kind() == std::io::ErrorKind::Other => return http::create_http_response(200, "application/json",  json::encode(vec![("status", json::JSONValue::String(format!("{e}")))]).as_str()),
             Err(e) => return http::create_http_response(400, "application/json",  json::encode(vec![("error", json::JSONValue::String(format!("{e}")))]).as_str()),
@@ -172,14 +162,6 @@ pub fn start_databese_console_queries_mode(schema_path: &str) {
         let mut query = String::new();
         stdin().read_line(&mut query).unwrap();
         query = query.trim().to_string();
-
-        let query = match query::parse_query(&query) {
-            Ok(query) => query,
-            Err(e) => {
-                println!("{e}");
-                continue;
-            },
-        };
 
         match db_engine.query(&query) {
             Ok(result) => println!("{}", util::db_result_prettify(result)),
