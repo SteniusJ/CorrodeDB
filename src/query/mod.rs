@@ -112,23 +112,29 @@ mod tests {
 
     #[test]
     fn test_query_parse() {
-        assert_eq!(parse_query("test[1,2,3,4] write 3n1298ud8h9apb").unwrap(), QueryResult {
+        assert_eq!(parse_query(r"test[1,2,3,4] write 3n1298ud8h9apb,sksdo\,kdskd | test dsadija,daisdoi").unwrap(), QueryResult {
             table_name: String::from("test"),
             indexes: vec![IndexType::Index(1),IndexType::Index(2),IndexType::Index(3),IndexType::Index(4)],
             fn_name: String::from("write"),
-            fn_param: String::from("3n1298ud8h9apb"),
+            fn_params: vec![String::from("3n1298ud8h9apb"),String::from(r"sksdo\,kdskd")],
+            sub_fn_name: String::from("test"),
+            sub_fn_params: vec![String::from("dsadija"),String::from("daisdoi")],
         });
-        assert_eq!(parse_query("test[*]").unwrap(), QueryResult {
+        assert_eq!(parse_query("test[*] | test thingy").unwrap(), QueryResult {
             table_name: String::from("test"),
             indexes: vec![IndexType::Wildcard],
             fn_name: String::new(),
-            fn_param: String::new(),
+            fn_params: vec![String::new()],
+            sub_fn_name: String::from("test"),
+            sub_fn_params: vec![String::from("thingy")],
         });
         assert_eq!(parse_query("test[1..5]").unwrap(), QueryResult {
             table_name: String::from("test"),
             indexes: vec![IndexType::Index(1),IndexType::Index(2),IndexType::Index(3),IndexType::Index(4),IndexType::Index(5)],
             fn_name: String::new(),
-            fn_param: String::new(),
+            fn_params: vec![String::new()],
+            sub_fn_name: String::new(),
+            sub_fn_params: Vec::new(),
         });
         parse_query("test 1 dsadsa i").expect_err("Succeeded in parsing incorrect query");
         parse_query("test[1.2]").expect_err("Succeeded in parsing incorrect query");

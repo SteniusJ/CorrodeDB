@@ -8,7 +8,7 @@ mod db_engine;
 
 use std::env;
 use std::collections::HashMap;
-use std::io::stdin;
+use std::io::{stdin, Result};
 
 const DEFAULT_SCHEMA_FILE_PATH: &str = "./schema.yaml";
 const DEFAULT_PORT: &str = "4067";
@@ -168,6 +168,14 @@ pub fn start_databese_console_queries_mode(schema_path: &str) {
             Err(e) => println!("{e}"),
         }
     }
+}
+
+/// Single query mode
+/// Mostly implemented for integration tests but may be used in the future
+/// for a single query application mode.
+pub fn single_query(schema_path: &str, query: &str) -> Result<Vec<HashMap<String, db_engine::DBDatatype>>> {
+    let mut db_engine = db_engine::DBEngine::new(schema_path);
+    db_engine.query(query)
 }
 
 /// Encodes returned data from file read into a json string
