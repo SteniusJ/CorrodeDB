@@ -34,57 +34,36 @@ impl DBSettings {
 
         let mut table_map: HashMap<String, TableSettings> = HashMap::new();
 
-        for tables in doc["tables"].as_hash().unwrap().iter().enumerate() {
-            let table_name = tables.1.0.as_str().unwrap();
-            let mut col_vec: Vec<ColSettings> = Vec::new();
+        for tables in doc["tables"].as_hash().expect("Expected object 'tables'").iter() {
 
-            // Tables have the possibility to hold other data than just what rows they include, but
-            // this is currently not used so we skip one and iterate the rows.
-            // 
-            // Not sure this is most optimal.
-            for columns in tables.1.1.as_hash()
-            .unwrap()
-            .iter()
-            .next()
-            .unwrap()
-            .1
-            .as_hash()
-            .unwrap()
-            .iter()
-            .enumerate() {
-                let mut col_settings = ColSettings {
-                    name: columns.1.0.as_str().unwrap().to_string(),
-                    value: ColValue::VarChar,
+            let table_name = tables.0.clone().into_string().expect("Expected table name");
+            let mut columns: Vec<ColSettings> = Vec::new();
+
+            for column in tables.1["columns"].as_hash().expect(&format!("expected table {table_name} to have columns, please create a object called 'columns'")).iter() {
+                let col_settings = ColSettings {
+                    name: column.0.clone().into_string().expect("Expected column name"),
+                    value: match column.1["value"].as_str().expect("Expected variable 'value'") {
+                        "NumberI" => ColValue::NumberI,
+                        "NumberF" => ColValue::NumberF,
+                        "VarChar" => ColValue::VarChar,
+                        v => panic!("Expected column value to be 'NumberI', 'NumberF' or 'VarChar', not '{v}'"),
+                    },
                 };
 
-                for col_data in columns.1.1.as_hash().unwrap().iter().enumerate() {
-                    match col_data.1.0.as_str().unwrap() {
-                        "value" => {
-                            col_settings.value = match col_data.1.1.as_str().unwrap() {
-                                "NumberI" => ColValue::NumberI,
-                                "NumberF" => ColValue::NumberF,
-                                "VarChar" => ColValue::VarChar,
-                                _ => ColValue::VarChar,
-                            }
-                        }
-                        _ => (),
-                    }
-                }
-
-                col_vec.push(col_settings);
+                columns.push(col_settings);
             }
 
             let table_settings = TableSettings {
-                columns: col_vec.clone(),
+                columns: columns,
                 biggest_id: 0,
             };
 
-            table_map.insert(table_name.to_string(), table_settings);
+            table_map.insert(table_name, table_settings);
         }
 
         DBSettings {
             tables: table_map,
-            compartment_rows: doc["settings"]["compartment"]["rows"].as_i64().unwrap() as i16,
+            compartment_rows: doc["settings"]["compartment"]["rows"].as_i64().expect("Expected compartmet rows value") as i16,
         }
     }
     pub fn table_exists(&self, table_name: &String) -> bool {

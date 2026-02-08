@@ -4,7 +4,7 @@ tables:
       id:
         value: VarChar
   images:
-    rows:
+    columns:
       id:
         value: NumberI
 
