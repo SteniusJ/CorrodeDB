@@ -102,7 +102,7 @@ fn load_functions() -> HashMap<String, DBFunction> {
                     query::IndexType::Index(i) => {
                         let (line, file_name, index) = util::get_line_fname_idx(db_settings, query, *i);
 
-                        match util::read_line(file_name.as_str(), file_system, line) {
+                        match util::read_line(&file_name, file_system, line) {
                             Ok(content) => {
                                 result.push(util::parse_db_line(content, index, &col_settings));
                             }
@@ -114,7 +114,7 @@ fn load_functions() -> HashMap<String, DBFunction> {
                     },
                     query::IndexType::Wildcard => {
                         let dir_name = format!("./tables/{}", query.table_name);
-                        let Ok(dir) = file_system.read_folder(dir_name.as_str()) else {
+                        let Ok(dir) = file_system.read_folder(&dir_name) else {
                             panic!("Critical failiure! Table '{}' does not have a folder", query.table_name);
                         };
                         let mut containers: Vec<u64> = dir.map(|res_dir_entry| 
@@ -131,7 +131,7 @@ fn load_functions() -> HashMap<String, DBFunction> {
 
                         for container in containers {
                             let file_name = format!("{}/{}", dir_name, container);
-                            match file_system.open(file_name.as_str()) {
+                            match file_system.open(&file_name) {
                                 Ok(_) => (),
                                 Err(e) if e.kind() == ErrorKind::InvalidInput => (),
                                 Err(e) => {
@@ -140,7 +140,7 @@ fn load_functions() -> HashMap<String, DBFunction> {
                                 },
                             }
 
-                            match file_system.read_from_cache(file_name.as_str()) {
+                            match file_system.read_from_cache(&file_name) {
                                 Ok(contents) => {
                                     for (line_index, content) in contents.iter().enumerate() {
                                         if !content.is_empty() {
@@ -204,7 +204,7 @@ fn load_functions() -> HashMap<String, DBFunction> {
                 query::IndexType::Index(i) => {
                     let (line, file_name, index) = util::get_line_fname_idx(db_settings, query, *i);
 
-                    let Ok(mut file_data) = util::file_read(file_name.as_str(), file_system) else {
+                    let Ok(mut file_data) = util::file_read(&file_name, file_system) else {
                         return Err(Error::new(ErrorKind::Other, "File read error"));
                     };
 
@@ -214,7 +214,7 @@ fn load_functions() -> HashMap<String, DBFunction> {
                         return Err(Error::new(ErrorKind::Other, "Attempting to write outside index bounds"));
                     }
 
-                    if util::file_write(file_name.as_str(), file_data, file_system) {
+                    if util::file_write(&file_name, file_data, file_system) {
                         return Ok(format!("Write to index: {index} succeeded"));
                     } else {
                         return Err(Error::new(ErrorKind::Other, "Write failed"));
@@ -228,13 +228,13 @@ fn load_functions() -> HashMap<String, DBFunction> {
                     };
                     let (_line, file_name, index) = util::get_line_fname_idx(db_settings, query, table_max_index);
 
-                    let Ok(mut file_data) = util::file_read(file_name.as_str(), file_system) else {
+                    let Ok(mut file_data) = util::file_read(&file_name, file_system) else {
                         return Err(Error::new(ErrorKind::Other, "File read error"));
                     };
 
                     file_data.push(query.fn_params.join(","));
 
-                    if util::file_write(file_name.as_str(), file_data, file_system) {
+                    if util::file_write(&file_name, file_data, file_system) {
                         db_settings.iterate_id(&query.table_name);
                         return Ok(format!("Write success, new index: {index}"));
                     } else {
@@ -262,13 +262,13 @@ fn load_functions() -> HashMap<String, DBFunction> {
 
             let (line, file_name, index) = util::get_line_fname_idx(db_settings, query, i);
 
-            let Ok(mut file_data) = util::file_read(file_name.as_str(), file_system) else {
+            let Ok(mut file_data) = util::file_read(&file_name, file_system) else {
                 return Err(Error::new(ErrorKind::Other, "File read error"));
             };
 
             file_data.insert(line as usize, String::new()); // Overwrite current value with empty String
             
-            if util::file_write(file_name.as_str(), file_data, file_system) {
+            if util::file_write(&file_name, file_data, file_system) {
                 return Ok(format!("Row at index {index} has been removed"));
             } else {
                 return Err(Error::new(ErrorKind::Other, "Write error"));
@@ -313,7 +313,7 @@ fn load_functions() -> HashMap<String, DBFunction> {
                     for index in indexes {
                         let (line, file_name, index) = util::get_line_fname_idx(db_settings, query, index);
 
-                        match util::read_line(file_name.as_str(), file_system, line) {
+                        match util::read_line(&file_name, file_system, line) {
                             Ok(content) => {
                                 if content.is_empty() {
                                     return Err(Error::new(ErrorKind::NotFound, "Line is empty"));
@@ -346,7 +346,7 @@ fn load_functions() -> HashMap<String, DBFunction> {
                     for i in indexes {
                         let (line, file_name, index) = util::get_line_fname_idx(db_settings, query, i);
 
-                        match util::read_line(file_name.as_str(), file_system, line) {
+                        match util::read_line(&file_name, file_system, line) {
                             Ok(content) => {
                                 if !content.is_empty() {
                                     result.push(util::parse_db_line(content, index, &col_settings));
@@ -480,13 +480,13 @@ fn load_functions() -> HashMap<String, DBFunction> {
                         let (line, file_name, index) = util::get_line_fname_idx(db_settings, query, *i);
                         let (column_index, column) = db_settings.tables.get(&query.table_name).unwrap().get_column(column.to_string()).unwrap();
 
-                        match util::read_line(file_name.as_str(), file_system,  line) {
+                        match util::read_line(&file_name, file_system,  line) {
                             Ok(content) => {
                                     if content.is_empty() {
                                         continue;
                                     }
 
-                                    let column_content = util::escape_split(content.as_str(), ',')[column_index];
+                                    let column_content = util::escape_split(&content, ',')[column_index];
 
                                     match is_matching(&column.value, &column_content, &value, &operator) {
                                         Ok(b) => {
@@ -507,7 +507,7 @@ fn load_functions() -> HashMap<String, DBFunction> {
                     },
                     query::IndexType::Wildcard => {
                         let dir_name = format!("./tables/{}", query.table_name);
-                        let Ok(dir) = file_system.read_folder(dir_name.as_str()) else {
+                        let Ok(dir) = file_system.read_folder(&dir_name) else {
                             panic!("Critical failiure! table '{}' does not have a folder", query.table_name);
                         };
                         let (column_index, column) = db_settings.tables.get(&query.table_name).unwrap().get_column(column.to_string()).unwrap();
@@ -517,7 +517,7 @@ fn load_functions() -> HashMap<String, DBFunction> {
                                 Ok(dir_entry) => {
                                     let container = dir_entry.file_name().into_string().unwrap().parse::<u64>().unwrap();
                                     let file_name = format!("{}/{}", dir_name, container);
-                                    match file_system.open(file_name.as_str()) {
+                                    match file_system.open(&file_name) {
                                         Ok(_) => (),
                                         Err(e) if e.kind() == ErrorKind::InvalidInput => (),
                                         Err(e) => {
@@ -526,7 +526,7 @@ fn load_functions() -> HashMap<String, DBFunction> {
                                         },
                                     }
 
-                                    match file_system.read_from_cache(file_name.as_str()) {
+                                    match file_system.read_from_cache(&file_name) {
                                         Ok(contents) => {
                                             for (index, content) in contents.into_iter().enumerate() {
                                                 if content.is_empty() {
@@ -535,7 +535,7 @@ fn load_functions() -> HashMap<String, DBFunction> {
 
                                                 let index = util::get_index(index as u64, container, db_settings);
 
-                                                let column_content = util::escape_split(content.as_str(), ',')[column_index];
+                                                let column_content = util::escape_split(&content, ',')[column_index];
 
                                                 match is_matching(&column.value, &column_content, &value, &operator) {
                                                     Ok(b) => {

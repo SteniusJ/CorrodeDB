@@ -73,7 +73,7 @@ pub fn data_integrity_check(schema_path: &str) {
         println!("Checking data for table: {table}");
 
         let dir_path = format!("./tables/{table}");
-        let Ok(dir) = file_system.read_folder(dir_path.as_str()) else {
+        let Ok(dir) = file_system.read_folder(&dir_path) else {
             panic!("table '{table}' does not have a folder");
         };
 
@@ -81,13 +81,13 @@ pub fn data_integrity_check(schema_path: &str) {
             let file = file.unwrap();
             let file_name = file.file_name().into_string().unwrap();
 
-            if let Ok(file_content) = util::file_read(format!("./tables/{table}/{file_name}").as_str(), &mut file_system) {
+            if let Ok(file_content) = util::file_read(&format!("./tables/{table}/{file_name}"), &mut file_system) {
                 for (index, line) in file_content.iter().enumerate() {
                     if line.is_empty() {
                         continue;
                     } 
 
-                    let columns_data = util::escape_split(line.as_str(), ',');
+                    let columns_data = util::escape_split(&line, ',');
 
                     if columns_data.len() != table_settings.columns.len() {
                         println!("! {table}: {file_name} - error on line {} - number of columns does not match!", index + 1);
@@ -144,9 +144,9 @@ pub fn start_database(schema_path: &str, port: &str) {
 
     http_server.add_endpoint("/", http::HTTPRequestMethods::POST, |body, _url_params| {
         match db_engine.query(&body) {
-            Ok(result) => return http::create_http_response(200, "application/json",  encode_db_return(result).as_str()),
-            Err(e) if e.kind() == std::io::ErrorKind::Other => return http::create_http_response(200, "application/json",  json::encode(vec![("status", json::JSONValue::String(format!("{e}")))]).as_str()),
-            Err(e) => return http::create_http_response(400, "application/json",  json::encode(vec![("error", json::JSONValue::String(format!("{e}")))]).as_str()),
+            Ok(result) => return http::create_http_response(200, "application/json",  &encode_db_return(result)),
+            Err(e) if e.kind() == std::io::ErrorKind::Other => return http::create_http_response(200, "application/json",  &json::encode(vec![("status", json::JSONValue::String(format!("{e}")))])),
+            Err(e) => return http::create_http_response(400, "application/json",  &json::encode(vec![("error", json::JSONValue::String(format!("{e}")))])),
         }
     });
 
