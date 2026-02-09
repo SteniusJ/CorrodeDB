@@ -193,7 +193,7 @@ fn encode_db_return(vec: Vec<HashMap<String, db_engine::DBDatatype>>) -> String 
             match content {
                 db_engine::DBDatatype::NumberI(v) => json_object.push((col_name, json::JSONValue::NumI(v))),
                 db_engine::DBDatatype::NumberF(v) => json_object.push((col_name, json::JSONValue::NumF(v))),
-                db_engine::DBDatatype::VarChar(v) => json_object.push((col_name, json::JSONValue::String(util::remove_escape_characters(v)))),
+                db_engine::DBDatatype::VarChar(v) => json_object.push((col_name, json::JSONValue::String(v))),
             }
         }
 

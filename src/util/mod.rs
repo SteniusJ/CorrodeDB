@@ -30,10 +30,16 @@ pub fn escape_split(input: &str, split_char: char) -> Vec<&str> {
     splits
 }
 
-/// Removes the / escape character from a string
-/// escapes "
-pub fn remove_escape_characters(input: String) -> String {
-    input.replace("\\", "").replace("\"", "\\\"")
+pub fn sanitize_db_entry(input: String) -> String {
+    let mut sanitized_string = String::new();
+    for char in input.chars() {
+        match char {
+            '\n' => sanitized_string.push_str(r"\n"),
+            '"' => sanitized_string.push_str("\\\""),
+            char => sanitized_string.push(char),
+        }
+    }
+    sanitized_string
 }
 
 /// Parses program arguments

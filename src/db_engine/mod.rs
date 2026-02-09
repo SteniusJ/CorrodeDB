@@ -237,7 +237,7 @@ fn load_functions() -> HashMap<String, DBFunction> {
                     };
 
                     if file_data.len() > line as usize {
-                        file_data[line as usize] = query.fn_params.join(",");
+                        file_data[line as usize] = util::sanitize_db_entry(query.fn_params.join(","));
                     } else {
                         return Err(Error::new(ErrorKind::Other, "Attempting to write outside index bounds"));
                     }
@@ -260,7 +260,7 @@ fn load_functions() -> HashMap<String, DBFunction> {
                         return Err(Error::new(ErrorKind::Other, "File read error"));
                     };
 
-                    file_data.push(query.fn_params.join(","));
+                    file_data.push(util::sanitize_db_entry(query.fn_params.join(",")));
 
                     if util::file_write(&file_name, file_data, file_system) {
                         db_settings.iterate_id(&query.table_name);
