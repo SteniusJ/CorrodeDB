@@ -10,6 +10,34 @@ pub enum DBDatatype {
     VarChar(String),
 }
 
+impl PartialEq for DBDatatype {
+    fn eq(&self, other: &Self) -> bool {
+        match self {
+            DBDatatype::NumberI(self_v) => {
+                if let DBDatatype::NumberI(other_v) = other {
+                    self_v == other_v
+                } else {
+                    false
+                }
+            },
+            DBDatatype::NumberF(self_v) => {
+                if let DBDatatype::NumberF(other_v) = other {
+                    self_v == other_v
+                } else {
+                    false
+                }
+            },
+            DBDatatype::VarChar(self_v) => {
+                if let DBDatatype::VarChar(other_v) = other {
+                    self_v == other_v
+                } else {
+                    false
+                }
+            },
+        }
+    }
+}
+
 #[derive(Debug)]
 enum DBFunction {
     Main(fn(&mut meta::DBSettings, &mut file::FileSystem, &query::QueryResult) -> Result<Vec<HashMap<String, DBDatatype>>>),

@@ -37,4 +37,19 @@ fn test_queries() {
     single_query(TEST_SCHEMA_PATH, "write[*] remove").expect_err("remove returned ok when given incorrect index"); // multi index remove
     single_query(TEST_SCHEMA_PATH, "write[1,2,3] remove").expect_err("remove returned ok when given incorrect index"); // multi index remove
     single_query(TEST_SCHEMA_PATH, "write[1..5] remove").expect_err("remove returned ok when given incorrect index"); // multi index remove
+
+
+    /*
+     * Test functions
+     */
+    // Test read
+    assert_eq!(single_query(TEST_SCHEMA_PATH, "read[*]").unwrap(), single_query(TEST_SCHEMA_PATH, "read[0..6]").unwrap());
+    single_query(TEST_SCHEMA_PATH, "read[1,4,6,3]").unwrap();
+    single_query(TEST_SCHEMA_PATH, "read[3..6]").unwrap();
+    // Test read sort
+    single_query(TEST_SCHEMA_PATH, "read[*] | sort float,asc").unwrap();
+    single_query(TEST_SCHEMA_PATH, "read[*] | sort int,dsc").unwrap();
+    // Test write
+    single_query(TEST_SCHEMA_PATH, "write[0] write 1,1.2,written from test").expect_err("not reachable");
+    let test = single_query(TEST_SCHEMA_PATH, "write[0]").unwrap()[0].get("string").unwrap();
 }
