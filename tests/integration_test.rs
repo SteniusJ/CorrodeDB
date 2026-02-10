@@ -1,9 +1,11 @@
 use corrode_db::single_query;
+use rand::prelude::*;
 
 const TEST_SCHEMA_PATH: &str = "test_schema.yaml";
 
 #[test]
 fn test_queries() {
+    let mut rng = rand::rng();
     /*
      * Test incorrect default inputs
      */
@@ -44,12 +46,31 @@ fn test_queries() {
      */
     // Test read
     assert_eq!(single_query(TEST_SCHEMA_PATH, "read[*]").unwrap(), single_query(TEST_SCHEMA_PATH, "read[0..6]").unwrap());
-    single_query(TEST_SCHEMA_PATH, "read[1,4,6,3]").unwrap();
-    single_query(TEST_SCHEMA_PATH, "read[3..6]").unwrap();
+    let result = single_query(TEST_SCHEMA_PATH, "read[1,4,6,3]").unwrap();
+    assert_eq!(result.len(), 4);
+    assert_eq!(result[2].get("string").unwrap().as_string().unwrap(), String::from("j this is row 6"));
+    let result = single_query(TEST_SCHEMA_PATH, "read[3..6]").unwrap();
+    assert_eq!(result.len(), 4);
+    assert_eq!(result[0].get("int").unwrap().as_i64().unwrap(), 3);
     // Test read sort
-    single_query(TEST_SCHEMA_PATH, "read[*] | sort float,asc").unwrap();
-    single_query(TEST_SCHEMA_PATH, "read[*] | sort int,dsc").unwrap();
+    assert_eq!(single_query(TEST_SCHEMA_PATH, "read[*] | sort float,asc").unwrap()[2].get("float").unwrap().as_f64().unwrap(), 2.1);
+    assert_eq!(single_query(TEST_SCHEMA_PATH, "read[*] | sort int,dsc").unwrap()[4].get("int").unwrap().as_i64().unwrap(), 2);
+
     // Test write
-    single_query(TEST_SCHEMA_PATH, "write[0] write 1,1.2,written from test").expect_err("not reachable");
-    let test = single_query(TEST_SCHEMA_PATH, "write[0]").unwrap()[0].get("string").unwrap();
+    let write_data = format!("0x{:X}", rng.random::<u128>());
+    single_query(TEST_SCHEMA_PATH, &format!("write[0] write 1,1.2,{write_data}")).expect_err("not reachable");
+    assert_eq!(single_query(TEST_SCHEMA_PATH, "write[0]").unwrap()[0].get("string").unwrap().as_string().unwrap(), write_data);
+
+    // Test random
+    let result = single_query(TEST_SCHEMA_PATH, "read[2..6] random 2").unwrap();
+    assert_eq!(result.len(), 2);
+
+    // Test where
+    assert_eq!(single_query(TEST_SCHEMA_PATH, "read[*] where int,<,3").unwrap()[2].get("int").unwrap().as_i64().unwrap(), 2);
+    assert_eq!(single_query(TEST_SCHEMA_PATH, "read[*] where string,=,d this is row 3").unwrap()[0].get("int").unwrap().as_i64().unwrap(), 3);
+    assert_eq!(single_query(TEST_SCHEMA_PATH, "read[*] where string,in,j").unwrap()[0].get("int").unwrap().as_i64().unwrap(), 6);
+
+    // Test remove
+    single_query(TEST_SCHEMA_PATH, "write[0] remove").expect_err("unreachable");
+    assert_eq!(single_query(TEST_SCHEMA_PATH, "write[0]").unwrap().is_empty(), true);
 }

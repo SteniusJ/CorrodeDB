@@ -147,7 +147,7 @@ pub fn parse_db_line(line: String, index: u64, col_settings: &Vec<meta::ColSetti
 
     for (column_index, column_content) in split_line.iter().enumerate() {
         let column_name = col_settings[column_index].name.clone();
-        
+
         match col_settings[column_index].value {
             meta::ColValue::NumberI => row_content.insert(column_name, db_engine::DBDatatype::NumberI(column_content.parse().unwrap())),
             meta::ColValue::NumberF => row_content.insert(column_name, db_engine::DBDatatype::NumberF(column_content.parse().unwrap())),

@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 use rand::prelude::*;
 use std::io::{Result, Error, ErrorKind};
+use std::option::Option;
 use crate::{file, meta, query, util};
 
 #[derive(Debug)]
@@ -8,6 +9,27 @@ pub enum DBDatatype {
     NumberI(i64),
     NumberF(f64),
     VarChar(String),
+}
+
+impl DBDatatype {
+    pub fn as_f64(&self) -> Option<f64>{
+        if let DBDatatype::NumberF(v) = self {
+            return Some(*v);
+        }
+        return None;
+    }
+    pub fn as_i64(&self) -> Option<i64> {
+        if let DBDatatype::NumberI(v) = self {
+            return Some(*v);
+        }
+        return None;
+    }
+    pub fn as_string(&self) -> Option<String> {
+        if let DBDatatype::VarChar(v) = self {
+            return Some(v.clone());
+        }
+        return None;
+    }
 }
 
 impl PartialEq for DBDatatype {
@@ -106,7 +128,6 @@ impl DBEngine {
             return Ok(result);
         }
 
-        println!("{result:?}");
         if let Some(DBFunction::Sub(sub_fn)) = self.sub_functions.get(&query.sub_fn_name) {
             sub_fn(result, &query, &self.db_settings)
         } else {
@@ -568,7 +589,7 @@ fn load_functions() -> HashMap<String, DBFunction> {
                                                 match is_matching(&column.value, &column_content, &value, &operator) {
                                                     Ok(b) => {
                                                         if b {
-                                                            result.push(util::parse_db_line(column_content.to_string(), index, col_settings));
+                                                            result.push(util::parse_db_line(content, index, col_settings));
                                                         }
                                                     },
                                                     Err(e) => {
