@@ -40,6 +40,10 @@ pub fn parse_query(query_str: &str) -> Result<QueryResult> {
     let mut indexes: Vec<IndexType> = Vec::new();
 
     for (i, index_str) in captures["index"].split(",").enumerate() {
+        if i != 0 && index_str == "*" {
+            return Err(Error::new(ErrorKind::InvalidInput, "Wildcard can only be used as the first index"));
+        }
+
         if i == 0 && index_str == "*" {
             indexes.push(IndexType::Wildcard);
             break;

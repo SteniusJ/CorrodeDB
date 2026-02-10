@@ -3,26 +3,26 @@ use std::io::{Result, Error, ErrorKind};
 use crate::{file, query, meta, db_engine};
 use std::collections::HashMap;
 
-/// Splits str by char ingoring those that have been escaped
+/// Splits str by char ignoring those that have been escaped
 pub fn escape_split(input: &str, split_char: char) -> Vec<&str> {
     let mut skip = false;
     let mut last_split_i = 0;
     let mut splits: Vec<&str> = Vec::new();
 
-    for char in input.chars().enumerate() {
+    for (index, char) in input.chars().enumerate() {
         if skip {
             skip = false;
             continue;
         }
         
-        if char.1 == '\\' {
+        if char == '\\' {
             skip = true;
             continue;
         }
 
-        if char.1 == split_char {
-            splits.push(input.get(last_split_i..char.0).unwrap());
-            last_split_i = char.0 + 1;
+        if char == split_char {
+            splits.push(input.get(last_split_i..index).unwrap());
+            last_split_i = index + 1;
         }
     }
 
@@ -35,11 +35,22 @@ pub fn sanitize_db_entry(input: String) -> String {
     for char in input.chars() {
         match char {
             '\n' => sanitized_string.push_str(r"\n"),
-            '"' => sanitized_string.push_str("\\\""),
+            '"' => sanitized_string.push_str("\""),
             char => sanitized_string.push(char),
         }
     }
     sanitized_string
+}
+
+pub fn rehydrate_db_entry(input: String) -> String {
+    let mut rehydrated_string = String::new();
+    for char in input.chars() {
+        match char {
+            '\\' => (),
+            char => rehydrated_string.push(char),
+        }
+    }
+    rehydrated_string
 }
 
 /// Parses program arguments
