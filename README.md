@@ -80,6 +80,16 @@ recommended to use if you have been touching around in the database files manual
 **default**<br>
 By default the data integrity check is false
 
+#### -cq
+
+flag for running the program in console queries debug mode.
+This mode allows the user to make db queries from the console interface.
+
+**usage:**<br>
+`-cq true` hast to be used with the values as `true`<br>
+**default**<br>
+By default the console queries is false
+
 ## Queries
 
 CorrodeDB has a unique query structure and support for four functions write,
@@ -114,8 +124,9 @@ the syntax for writing data is:<br>
 `{table name}[{index}] write {new data}`
 
 !Data can only be written to one index at a time. The new data is given in a
-comma seperated string. Commas can be escaped in VarChar values by using the
-"\\" escape character.
+comma seperated string. Characters used in the query syntax can be escaped in VarChar
+values by using the "\\" escape character. For example "," and "|" are both used in
+the query syntax and they can be escaped by typing "\\," or "\\|".
 
 **Writing to specific index**<br>
 `messages[10] write hello\, world,100,12.239`<br>
@@ -175,3 +186,42 @@ this query will get all the rows from the indexes **1,20,36,37,49,90** where
 the column **number** is less than 20<br>
 
 **note!** this operator can only be used with Number values
+
+## Sub functions
+
+Sub functions are data transformation functions which can be used to transform
+the returned db data.
+
+**Syntax:**<br>
+sub functions are used by "piping" the data into them.<br>
+**example:**<br>
+`messages[*] | sort message,asc`<br>
+this query "pipes" the return data of `messages[*]` into the sub function "sort"
+which sorts the return in ascending order by the column "messages".
+
+sub functions can be used on any db functions which return data. For example
+sub functions can not be used on the function "remove" or "write" since
+these do not return data, just a status.
+
+**this is a valid use of the sort sub function:**<br>
+`messages[10..100] where message,in,hello | sort message,asc`<br>
+**this is not:**<br>
+`messages[*] write hello world | sort message,asc`<br>
+
+### sort
+
+sorts data in ascending or descending order by given column.
+Uses merge sort algorithm.
+
+**usage:**<br>
+`messages[*] | sort message,asc`<br>
+
+#### Parameters
+
+`message[*] | sort {column name},{sort mode}`<br>
+**Column name:**<br>
+any name of a database column in the given table.<br>
+**Sort mode:**<br>
+
+- `asc` for ascending
+- `dsc` for descending

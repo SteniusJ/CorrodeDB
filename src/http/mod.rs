@@ -60,13 +60,9 @@ impl<'a> HTTPServer<'a> {
                 continue;
             };
             let mut buf_reader = BufReader::new(&mut stream);
-
             let mut request_header = parse_http_request_header(&mut buf_reader);
 
-            println!("{request_header:?}");
-
             let mut res = String::new();
-
             for middleware in &mut self.middleware {
                 let middleware_res = middleware(&mut request_header.content, &mut request_header.url_parameters);
                 if !middleware_res.0 {

@@ -1,0 +1,22 @@
+tables:
+  read:
+    columns:
+      int:
+        value: NumberI
+      float:
+        value: NumberF
+      string:
+        value: VarChar
+  write:
+    columns:
+      int:
+        value: NumberI
+      float:
+        value: NumberF
+      string:
+        value: VarChar
+
+settings:
+  compartment:
+    rows: 5
+  password: Test
