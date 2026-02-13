@@ -76,13 +76,10 @@ pub fn read_from_db(db_settings: &mut meta::DBSettings, file_system: &mut file::
 
 /// write function logic
 /// Writes data to database
-pub fn write_to_db(db_settings: &mut meta::DBSettings, file_system: &mut file::FileSystem, query: &query::QueryResult) -> Result<String> {
-    if query.indexes.len() > 1 {
-        return Err(Error::new(ErrorKind::InvalidInput, "Data can only be written to one index at a time"));
-    }
-
+pub fn write_to_db(db_settings: &mut meta::DBSettings, file_system: &mut file::FileSystem, query: &query::QueryResult) -> Result<(String, Vec<i64>)> {
     let write_data = &query.fn_params;
     let columns = &db_settings.tables.get(&query.table_name).unwrap().columns;
+    let mut affected_indexes: Vec<i64> = Vec::new();
 
     if write_data.len() != columns.len() {
         return Err(Error::new(ErrorKind::InvalidInput, "The number of arguments does not match the number of data columns in the table"));
@@ -107,48 +104,54 @@ pub fn write_to_db(db_settings: &mut meta::DBSettings, file_system: &mut file::F
         }
     }
 
-    // Since data can only be written to one index at a time
-    // we only need to look at the first index.
-    match &query.indexes[0] {
-        query::IndexType::Index(i) => {
-            let (line, file_name, index) = util::get_line_fname_idx(db_settings, query, *i);
+    for index in &query.indexes {
+        // Since data can only be written to one index at a time
+        // we only need to look at the first index.
+        match index {
+            query::IndexType::Index(i) => {
+                let (line, file_name, index) = util::get_line_fname_idx(db_settings, query, *i);
 
-            let Ok(mut file_data) = util::file_read(&file_name, file_system) else {
-                return Err(Error::new(ErrorKind::Other, "File read error"));
-            };
+                let Ok(mut file_data) = util::file_read(&file_name, file_system) else {
+                    return Err(Error::new(ErrorKind::Other, "File read error"));
+                };
 
-            if file_data.len() > line as usize {
-                file_data[line as usize] = util::sanitize_db_entry(query.fn_params.join(","));
-            } else {
-                return Err(Error::new(ErrorKind::Other, "Attempting to write outside index bounds"));
-            }
+                if file_data.len() > line as usize {
+                    file_data[line as usize] = util::sanitize_db_entry(query.fn_params.join(","));
+                } else {
+                    return Err(Error::new(ErrorKind::Other, "Attempting to write outside index bounds"));
+                }
 
-            if util::file_write(&file_name, file_data, file_system) {
-                return Ok(format!("Write to index: {index} succeeded"));
-            } else {
-                return Err(Error::new(ErrorKind::Other, "Write failed"));
-            }
-        },
-        query::IndexType::Wildcard => {
-            let table_max_index = if db_settings.tables.get(&query.table_name).unwrap().biggest_id > 0 {
-                db_settings.tables.get(&query.table_name).unwrap().biggest_id + 1
-            } else {
-                0
-            };
-            let (_line, file_name, index) = util::get_line_fname_idx(db_settings, query, table_max_index);
+                affected_indexes.push(index as i64);
+            },
+            query::IndexType::Wildcard => {
+                let table_max_index = if db_settings.tables.get(&query.table_name).unwrap().biggest_id > 0 {
+                    db_settings.tables.get(&query.table_name).unwrap().biggest_id + 1
+                } else {
+                    0
+                };
+                let (_line, file_name, index) = util::get_line_fname_idx(db_settings, query, table_max_index);
 
-            let Ok(mut file_data) = util::file_read(&file_name, file_system) else {
-                return Err(Error::new(ErrorKind::Other, "File read error"));
-            };
+                let Ok(mut file_data) = util::file_read(&file_name, file_system) else {
+                    return Err(Error::new(ErrorKind::Other, "File read error"));
+                };
 
-            file_data.push(util::sanitize_db_entry(query.fn_params.join(",")));
+                file_data.push(util::sanitize_db_entry(query.fn_params.join(",")));
 
-            if util::file_write(&file_name, file_data, file_system) {
-                db_settings.iterate_id(&query.table_name);
-                return Ok(format!("Write success, new index: {index}"));
-            } else {
-                return Err(Error::new(ErrorKind::InvalidInput, "Write failed"));
-            }
+                if util::file_write(&file_name, file_data, file_system) {
+                    db_settings.iterate_id(&query.table_name);
+                    return Ok((String::from("data write success"), vec![index as i64]));
+                } else {
+                    return Err(Error::new(ErrorKind::InvalidInput, "Write failed"));
+                }
+            },
+        }
+    }
+
+    match file_system.write_entire_cache_to_disk() {
+        Ok(_) => Ok((String::from("write success"), affected_indexes)),
+        Err(e) => {
+            file_system.drop_entire_cache();
+            Err(e)
         },
     }
 } 
@@ -157,26 +160,55 @@ pub fn write_to_db(db_settings: &mut meta::DBSettings, file_system: &mut file::F
 ///
 /// Removes data from database
 /// Overwrites data with empty string effectively deleting it
-pub fn remove_from_db(db_settings: &mut meta::DBSettings, file_system: &mut file::FileSystem, query: &query::QueryResult) -> Result<String> {
-    if query.indexes.len() > 1 {
-        return Err(Error::new(ErrorKind::InvalidInput, "Data can only be removed from one index at a time"));
+pub fn remove_from_db(db_settings: &mut meta::DBSettings, file_system: &mut file::FileSystem, query: &query::QueryResult) -> Result<(String, Vec<i64>)> {
+    let mut affected_indexes: Vec<i64> = Vec::new();
+
+    for index in &query.indexes {
+        match index {
+            query::IndexType::Index(i) => {
+                let (line, file_name, index) = util::get_line_fname_idx(db_settings, query, *i);
+
+                let Ok(mut file_data) = util::file_read(&file_name, file_system) else {
+                    return Err(Error::new(ErrorKind::Other, "File read error"));
+                };
+
+                file_data.insert(line as usize, String::new()); // Overwrite current value with empty String
+                affected_indexes.push(index as i64);
+            },
+            query::IndexType::Wildcard => {
+                let dir_name = format!("./tables/{}", query.table_name);
+                let Ok(dir) = file_system.read_folder(&dir_name) else {
+                    return Err(Error::new(ErrorKind::Other, "Failed to open directory"));
+                };
+
+                for dir_entry in dir {
+                    let Ok(dir_entry) = dir_entry else {
+                        return Err(Error::new(ErrorKind::Other, "Failed to open directory"));
+                    };
+
+                    let Ok(file_name) = dir_entry.file_name().into_string() else {
+                        return Err(Error::new(ErrorKind::Other, "Faied to convert into string"));
+                    };
+
+                    let file_dir = format!("./tables/{}/{file_name}", query.table_name);
+                    match file_system.remove(&file_dir) {
+                        Ok(_) => {
+                            db_settings.reset_id(&query.table_name);
+                        },
+                        Err(e) => return Err(e),
+                    }
+                }
+                return Ok((String::from("table dropped"), Vec::new()));
+            },
+        }
     }
 
-    let query::IndexType::Index(i) = query.indexes[0] else {
-        return Err(Error::new(ErrorKind::InvalidInput, "Index type is incorrect"));
-    };
-
-    let (line, file_name, index) = util::get_line_fname_idx(db_settings, query, i);
-
-    let Ok(mut file_data) = util::file_read(&file_name, file_system) else {
-        return Err(Error::new(ErrorKind::Other, "File read error"));
-    };
-
-    file_data.insert(line as usize, String::new()); // Overwrite current value with empty String
-    
-    if util::file_write(&file_name, file_data, file_system) {
-        return Ok(format!("Row at index {index} has been removed"));
-    } else {
-        return Err(Error::new(ErrorKind::Other, "Write error"));
+    // Write all changes at once to disk
+    match file_system.write_entire_cache_to_disk() {
+        Ok(_) => Ok((String::from("remove success"), affected_indexes)),
+        Err(e) => {
+            file_system.drop_entire_cache();
+            Err(e)
+        },
     }
 }

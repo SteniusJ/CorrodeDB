@@ -106,10 +106,16 @@ impl PartialOrd for DBDatatype {
     }
 }
 
+pub enum DBResult {
+    Data(Vec<HashMap<String, DBDatatype>>),
+    Status((String, Vec<i64>)),
+    Error(Error),
+}
+
 #[derive(Debug)]
 enum DBFunction {
     Main(fn(&mut meta::DBSettings, &mut file::FileSystem, &query::QueryResult) -> Result<Vec<HashMap<String, DBDatatype>>>),
-    MainReturnStatus(fn(&mut meta::DBSettings, &mut file::FileSystem, &query::QueryResult) -> Result<String>),
+    MainReturnStatus(fn(&mut meta::DBSettings, &mut file::FileSystem, &query::QueryResult) -> Result<(String, Vec<i64>)>),
     Sub(fn(Vec<HashMap<String, DBDatatype>>, &query::QueryResult, &meta::DBSettings) -> Result<Vec<HashMap<String, DBDatatype>>>),
 }
 
@@ -129,23 +135,23 @@ impl DBEngine {
             sub_functions: load_sub_functions(),
         }
     }
-    pub fn query(&mut self, query: &str) -> Result<Vec<HashMap<String, DBDatatype>>> {
+    pub fn query(&mut self, query: &str) -> DBResult {
         let query = match query::parse_query(query) {
             Ok(query) => query,
             Err(e) => {
                 println!("Query parse error: {e}");
-                return Err(Error::new(ErrorKind::InvalidInput, "Query parse error"));
+                return DBResult::Error(Error::new(ErrorKind::InvalidInput, "Query parse error"));
             }
         };
 
         println!("{query}");
 
         if !self.db_settings.table_exists(&query.table_name) {
-            return Err(Error::new(ErrorKind::NotFound, "Table doesn't exist'"));
+            return DBResult::Error(Error::new(ErrorKind::NotFound, "Table doesn't exist'"));
         }
 
         let Some(main_function) = self.functions.get(&query.fn_name) else {
-            return Err(Error::new(ErrorKind::NotFound, "Function not found"));
+            return DBResult::Error(Error::new(ErrorKind::NotFound, "Function not found"));
         };
 
         let result = match *main_function {
@@ -153,31 +159,34 @@ impl DBEngine {
                 match func(&mut self.db_settings, &mut  self.file_system, &query) {
                     Ok(result) => result,
                     Err(e) => {
-                        return Err(e);
+                        return DBResult::Error(e);
                     },
                 }
             }
             DBFunction::MainReturnStatus(func) => {
                 match func(&mut self.db_settings, &mut  self.file_system, &query) {
-                    Ok(status) => {
-                        return Err(Error::new(ErrorKind::Other, status));
+                    Ok((status, affected_indexes)) => {
+                        return DBResult::Status((status, affected_indexes));
                     },
                     Err(e) => {
-                        return Err(e);
+                        return DBResult::Error(e);
                     },
                 }
             },
-            _ => return Err(Error::new(ErrorKind::Other, "not reachable")),
+            _ => return DBResult::Error(Error::new(ErrorKind::Other, "not reachable")),
         };
 
         if query.sub_fn_name.is_empty() {
-            return Ok(result);
+            return DBResult::Data(result);
         }
 
         if let Some(DBFunction::Sub(sub_fn)) = self.sub_functions.get(&query.sub_fn_name) {
-            sub_fn(result, &query, &self.db_settings)
+            match sub_fn(result, &query, &self.db_settings) {
+                Ok(result) => DBResult::Data(result),
+                Err(e) => DBResult::Error(e),
+            }
         } else {
-            Err(Error::new(ErrorKind::NotFound, "sub function not found"))
+            DBResult::Error(Error::new(ErrorKind::NotFound, "sub function not found"))
         }
     }
 }
