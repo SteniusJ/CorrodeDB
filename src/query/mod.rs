@@ -15,16 +15,16 @@ pub struct QueryResult {
     pub indexes: Vec<IndexType>,
     pub fn_name: String,
     pub fn_params: Vec<String>,
-    pub sub_fn_name: String,
-    pub sub_fn_params: Vec<String>,
+    pub sub_fn_names: Vec<String>,
+    pub sub_fn_params: Vec<Vec<String>>,
 }
 
 impl fmt::Display for QueryResult {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        if self.sub_fn_name.is_empty() {
+        if self.sub_fn_names.is_empty() {
             write!(f, "Query: {}{:?} {} {:?}", self.table_name, self.indexes, self.fn_name, self.fn_params)
         } else {
-            write!(f, "Query: {}{:?} {} {:?} | {} {:?}", self.table_name, self.indexes, self.fn_name, self.fn_params, self.sub_fn_name, self.sub_fn_params)
+            write!(f, "Query: {}{:?} {} {:?} | {:?} {:?}", self.table_name, self.indexes, self.fn_name, self.fn_params, self.sub_fn_names, self.sub_fn_params)
         }
     }
 }
@@ -78,26 +78,27 @@ pub fn parse_query(query_str: &str) -> Result<QueryResult> {
 
     // Possibly temporary solution until I come up with a better regex
     let param_split = util::escape_split(&captures["function_params"], '|');
-    
-    let fn_params: Vec<String> = util::escape_split(param_split[0].trim(), ',').iter().map(|v| String::from(*v)).collect();
 
-    if param_split.len() > 1 {
-        let sub_split: Vec<&str> = param_split[1].trim().splitn(2, ' ').collect();
-        
-        if sub_split.len() != 2 {
-            return Err(Error::new(ErrorKind::InvalidInput, "sub functions require parameters"));
+    let mut fn_params: Vec<String> = Vec::new();
+    let mut sub_fn_names: Vec<String> = Vec::new();
+    let mut sub_fn_params: Vec<Vec<String>> = Vec::new();
+
+    for (index, fn_str) in param_split.iter().enumerate() {
+        let fn_str = fn_str.trim();
+
+        if index == 0 { // we are on the first index which is main function params
+            fn_params = util::escape_split(fn_str, ',').iter().map(|v| String::from(*v)).collect();
+            continue;
         }
 
-        let sub_fn_params: Vec<String> = util::escape_split(sub_split[1].trim(), ',').iter().map(|v| String::from(*v)).collect();
+        let sub_fn_split: Vec<&str> = fn_str.splitn(2, ' ').collect();
 
-        return Ok(QueryResult {
-            table_name: captures["table_name"].to_string(),
-            indexes: indexes,
-            fn_name: captures["function_name"].to_string(),
-            fn_params: fn_params,
-            sub_fn_name: sub_split[0].to_string(),
-            sub_fn_params: sub_fn_params,
-        });
+        sub_fn_names.push(sub_fn_split[0].to_string());
+
+        if sub_fn_split.len() != 2 {
+            return Err(Error::new(ErrorKind::InvalidInput, "sub functions require parameters"));
+        }
+        sub_fn_params.push(util::escape_split(sub_fn_split[1].trim(), ',').iter().map(|v| String::from(*v)).collect());
     }
 
     Ok(QueryResult {
@@ -105,8 +106,8 @@ pub fn parse_query(query_str: &str) -> Result<QueryResult> {
         indexes: indexes,
         fn_name: captures["function_name"].to_string(),
         fn_params: fn_params,
-        sub_fn_name: String::new(),
-        sub_fn_params: Vec::new(),
+        sub_fn_names: sub_fn_names,
+        sub_fn_params: sub_fn_params,
     })
 }
 
@@ -121,23 +122,23 @@ mod tests {
             indexes: vec![IndexType::Index(1),IndexType::Index(2),IndexType::Index(3),IndexType::Index(4)],
             fn_name: String::from("write"),
             fn_params: vec![String::from("3n1298ud8h9apb"),String::from(r"sksdo\,kdskd")],
-            sub_fn_name: String::from("test"),
-            sub_fn_params: vec![String::from("dsadija"),String::from("daisdoi")],
+            sub_fn_names: vec![String::from("test")],
+            sub_fn_params: vec![vec![String::from("dsadija"),String::from("daisdoi")]],
         });
-        assert_eq!(parse_query("test[*] | test thingy").unwrap(), QueryResult {
+        assert_eq!(parse_query("test[*] | test thingy | othertest thingy,1").unwrap(), QueryResult {
             table_name: String::from("test"),
             indexes: vec![IndexType::Wildcard],
             fn_name: String::new(),
             fn_params: vec![String::new()],
-            sub_fn_name: String::from("test"),
-            sub_fn_params: vec![String::from("thingy")],
+            sub_fn_names: vec![String::from("test"), String::from("othertest")],
+            sub_fn_params: vec![vec![String::from("thingy")], vec![String::from("thingy"), String::from("1")]],
         });
         assert_eq!(parse_query("test[1..5]").unwrap(), QueryResult {
             table_name: String::from("test"),
             indexes: vec![IndexType::Index(1),IndexType::Index(2),IndexType::Index(3),IndexType::Index(4),IndexType::Index(5)],
             fn_name: String::new(),
             fn_params: vec![String::new()],
-            sub_fn_name: String::new(),
+            sub_fn_names: Vec::new(),
             sub_fn_params: Vec::new(),
         });
         parse_query("test 1 dsadsa i").expect_err("Succeeded in parsing incorrect query");

@@ -6,7 +6,7 @@ use crate::{file, meta, query};
 mod db_functions;
 mod db_sub_functions;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum DBDatatype {
     NumberI(i64),
     NumberF(f64),
@@ -116,7 +116,7 @@ pub enum DBResult {
 enum DBFunction {
     Main(fn(&mut meta::DBSettings, &mut file::FileSystem, &query::QueryResult) -> Result<Vec<HashMap<String, DBDatatype>>>),
     MainReturnStatus(fn(&mut meta::DBSettings, &mut file::FileSystem, &query::QueryResult) -> Result<(String, Vec<i64>)>),
-    Sub(fn(Vec<HashMap<String, DBDatatype>>, &query::QueryResult, &meta::DBSettings) -> Result<Vec<HashMap<String, DBDatatype>>>),
+    Sub(fn(&mut Vec<HashMap<String, DBDatatype>>, &query::QueryResult, &Vec<String>, &meta::DBSettings) -> Result<()>),
 }
 
 pub struct DBEngine {
@@ -154,7 +154,7 @@ impl DBEngine {
             return DBResult::Error(Error::new(ErrorKind::NotFound, "Function not found"));
         };
 
-        let result = match *main_function {
+        let mut result = match *main_function {
             DBFunction::Main(func) => {
                 match func(&mut self.db_settings, &mut  self.file_system, &query) {
                     Ok(result) => result,
@@ -176,18 +176,22 @@ impl DBEngine {
             _ => return DBResult::Error(Error::new(ErrorKind::Other, "not reachable")),
         };
 
-        if query.sub_fn_name.is_empty() {
+        if query.sub_fn_names.is_empty() {
             return DBResult::Data(result);
         }
 
-        if let Some(DBFunction::Sub(sub_fn)) = self.sub_functions.get(&query.sub_fn_name) {
-            match sub_fn(result, &query, &self.db_settings) {
-                Ok(result) => DBResult::Data(result),
-                Err(e) => DBResult::Error(e),
+        for (index, sub_fn_name) in query.sub_fn_names.iter().enumerate() {
+            if let Some(DBFunction::Sub(sub_fn)) = self.sub_functions.get(sub_fn_name) {
+                match sub_fn(&mut result, &query, &query.sub_fn_params[index], &self.db_settings) {
+                    Ok(_) => (),
+                    Err(e) => return DBResult::Error(e),
+                }
+            } else {
+                return DBResult::Error(Error::new(ErrorKind::NotFound, "sub function not found"));
             }
-        } else {
-            DBResult::Error(Error::new(ErrorKind::NotFound, "sub function not found"))
         }
+
+        DBResult::Data(result)
     }
 }
 

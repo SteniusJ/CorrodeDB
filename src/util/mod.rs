@@ -174,113 +174,73 @@ pub fn db_result_prettify(result: Vec<HashMap<String, db_engine::DBDatatype>>) -
     pretty_string
 }
 
-pub fn merge_sort(data: Vec<HashMap<String, db_engine::DBDatatype>>, sort_order: &str, sort_column: &str) -> Result<Vec<HashMap<String, db_engine::DBDatatype>>> {
+pub fn merge_sort(data: &mut Vec<HashMap<String, db_engine::DBDatatype>>, sort_order: &str, sort_column: &str, left: usize, right: usize) -> Result<()> {
     if data.len() <= 1 {
-        return Ok(data);
+        return Ok(())
     }
 
-    let mut left: Vec<HashMap<String, db_engine::DBDatatype>> = Vec::new();
-    let mut right: Vec<HashMap<String, db_engine::DBDatatype>> = Vec::new();
-    let data_len = data.len();
+    if left < right {
+        let mid = left + (right - left) / 2;
 
-    for (index, value) in data.into_iter().enumerate() {
-        if index < (data_len / 2) {
-            left.push(value);
-        } else {
-            right.push(value);
+        merge_sort(data, sort_order, sort_column, left, mid).unwrap();
+        merge_sort(data, sort_order, sort_column, mid + 1, right).unwrap();
+
+        match merge(data, sort_order, sort_column, left, mid, right) {
+            Ok(_) => (),
+            Err(e) => return Err(e),
         }
     }
 
-    left = match merge_sort(left, sort_order, sort_column) {
-        Ok(data) => data,
-        Err(e) => return Err(e),
-    };
-    right = match merge_sort(right, sort_order, sort_column) {
-        Ok(data) => data,
-        Err(e) => return Err(e),
-    };
-
-    merge(&mut left, &mut right, sort_order, sort_column)
+    Ok(())
 }
 
-fn merge(left: &mut Vec<HashMap<String, db_engine::DBDatatype>>, right: &mut Vec<HashMap<String, db_engine::DBDatatype>>, sort_order: &str, sort_column: &str) -> Result<Vec<HashMap<String, db_engine::DBDatatype>>> {
-    let mut result: Vec<HashMap<String, db_engine::DBDatatype>> = Vec::new();
+fn merge(data: &mut Vec<HashMap<String, db_engine::DBDatatype>>, sort_order: &str, sort_column: &str, mut start: usize, mut mid: usize, end: usize) -> Result<()>{
+    let mut start2 = mid + 1;
 
-    while !left.is_empty() && !right.is_empty() {
+    if data[mid].get(sort_column).unwrap() <= data[start2].get(sort_column).unwrap() {
+        return Ok(());
+    }
+
+    while start <= mid && start2 <= end {
         match sort_order {
             "asc" => {
-                match left.first().unwrap().get(sort_column).unwrap() {
-                    db_engine::DBDatatype::NumberI(left_v) => {
-                        if let db_engine::DBDatatype::NumberI(right_v) = right.first().unwrap().get(sort_column).unwrap() {
-                            if left_v <= right_v {
-                                result.push(left.remove(0));
-                            } else {
-                                result.push(right.remove(0));
-                            }
-                        }
-                    },
-                    db_engine::DBDatatype::NumberF(left_v) => {
-                        if let db_engine::DBDatatype::NumberF(right_v) = right.first().unwrap().get(sort_column).unwrap() {
-                            if left_v <= right_v {
-                                result.push(left.remove(0));
-                            } else {
-                                result.push(right.remove(0));
-                            }
-                        }
-                    },
-                    db_engine::DBDatatype::VarChar(left_v) => {
-                        if let db_engine::DBDatatype::VarChar(right_v) = right.first().unwrap().get(sort_column).unwrap() {
-                            if left_v <= right_v {
-                                result.push(left.remove(0));
-                            } else {
-                                result.push(right.remove(0));
-                            }
-                        }
-                    },
+                if data[start].get(sort_column).unwrap() <= data[start2].get(sort_column).unwrap() {
+                    start += 1;
+                } else {
+                    let value = data[start2].clone();
+                    let mut index = start2;
+
+                    while index != start {
+                        data[index] = data[index - 1].clone();
+                        index -= 1;
+                    }
+                    data[start] = value;
+
+                    start += 1;
+                    mid += 1;
+                    start2 += 1;
                 }
             },
             "dsc" => {
-                match left.first().unwrap().get(sort_column).unwrap() {
-                    db_engine::DBDatatype::NumberI(left_v) => {
-                        if let db_engine::DBDatatype::NumberI(right_v) = right.first().unwrap().get(sort_column).unwrap() {
-                            if left_v >= right_v {
-                                result.push(left.remove(0));
-                            } else {
-                                result.push(right.remove(0));
-                            }
-                        }
-                    },
-                    db_engine::DBDatatype::NumberF(left_v) => {
-                        if let db_engine::DBDatatype::NumberF(right_v) = right.first().unwrap().get(sort_column).unwrap() {
-                            if left_v >= right_v {
-                                result.push(left.remove(0));
-                            } else {
-                                result.push(right.remove(0));
-                            }
-                        }
-                    },
-                    db_engine::DBDatatype::VarChar(left_v) => {
-                        if let db_engine::DBDatatype::VarChar(right_v) = right.first().unwrap().get(sort_column).unwrap() {
-                            if left_v >= right_v {
-                                result.push(left.remove(0));
-                            } else {
-                                result.push(right.remove(0));
-                            }
-                        }
-                    },
+                if data[start].get(sort_column).unwrap() >= data[start2].get(sort_column).unwrap() {
+                    start += 1;
+                } else {
+                    let value = data[start2].clone();
+                    let mut index = start2;
+
+                    while index != start {
+                        data[index] = data[index - 1].clone();
+                        index -= 1;
+                    }
+                    data[start] = value;
+
+                    start += 1;
+                    mid += 1;
+                    start2 += 1;
                 }
             },
-            ord => return Err(Error::new(ErrorKind::InvalidInput, format!("{ord} is not a valid sort order"))),
+            ord => return Err(Error::new(ErrorKind::InvalidInput, format!("{ord} is not a valid sorting order"))),
         }
-
     }
-
-    while !left.is_empty() {
-        result.push(left.remove(0));
-    }
-    while !right.is_empty() {
-        result.push(right.remove(0));
-    }
-
-    Ok(result)
+    Ok(())
 }
