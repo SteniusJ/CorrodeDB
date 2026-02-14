@@ -1,12 +1,53 @@
 use regex::Regex;
 use std::io::{Result, Error, ErrorKind};
+use std::option::Option;
 use std::fmt;
-use crate::util;
+use crate::{util, meta};
+use std::ops::RangeInclusive;
 
 #[derive(Debug, PartialEq)]
 pub enum IndexType {
     Index(u64),
     Wildcard,
+}
+
+impl PartialOrd for IndexType {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        match self {
+            IndexType::Index(self_v) => {
+                if let IndexType::Index(other_v) = other {
+                    Some(self_v.cmp(other_v))
+                } else {
+                    None
+                }
+            },
+            IndexType::Wildcard => {
+                None
+            },
+        }
+    }
+}
+
+impl IndexType {
+    fn from_str(from: &str) -> Option<IndexType> {
+        if from == "*" {
+            return Some(IndexType::Wildcard);
+        }
+        if let Ok(v) = from.parse::<u64>() {
+            return Some(IndexType::Index(v));
+        }
+        None
+    }
+    fn into_range_inclusive(self, to: IndexType) -> Result<RangeInclusive<u64>> {
+        if self == IndexType::Wildcard || to == IndexType::Wildcard {
+            return Err(Error::new(ErrorKind::InvalidInput, "range does not work on Wildcard"));
+        }
+
+        if let (IndexType::Index(from_v), IndexType::Index(to_v)) = (self, to) {
+            return Ok(from_v..=to_v);
+        }
+        Err(Error::new(ErrorKind::Other, "range couldn't be made"))
+    }
 }
 
 #[derive(Debug, PartialEq)]
@@ -30,50 +71,68 @@ impl fmt::Display for QueryResult {
 }
 
 /// Parses database query
-pub fn parse_query(query_str: &str) -> Result<QueryResult> {
+pub fn parse_query(query_str: &str, db_settings: &meta::DBSettings) -> Result<QueryResult> {
     let re = Regex::new(r"(?<table_name>[[:alnum:]]*)\[(?<index>[[:digit:],.*]*)\] ?(?<function_name>[[:alnum:]]*) ?(?<function_params>[[:ascii:]]*)\)?").unwrap();
 
     let Some(captures) = re.captures(query_str) else {
         return Err(Error::new(ErrorKind::NotFound, "No captures found"));
     };
 
+    let table_name = captures["table_name"].to_string();
+
+    if !db_settings.table_exists(&table_name) {
+        return Err(Error::new(ErrorKind::InvalidInput, format!("Table {} doesn't exist", &captures["table_name"])))
+    }
+
     let mut indexes: Vec<IndexType> = Vec::new();
 
     for (i, index_str) in captures["index"].split(",").enumerate() {
-        if i != 0 && index_str == "*" {
-            return Err(Error::new(ErrorKind::InvalidInput, "Wildcard can only be used as the first index"));
-        }
-
-        if i == 0 && index_str == "*" {
-            indexes.push(IndexType::Wildcard);
-            break;
-        }
-
         if i == 0 {
-            let range_re = Regex::new(r"(?<start_index>[[:digit:]]*)\.\.(?<end_index>[[:digit:]]*)").unwrap();
+            let range_re = Regex::new(r"(?<start_index>[[:digit:]*]*)\.\.(?<end_index>[[:digit:]*]*)").unwrap();
             match range_re.captures(index_str) {
                 Some(captures) => {
-                    let start_index = captures["start_index"].parse::<u64>().unwrap(); // safe to assume capture is digit as regex statment makes sure of that
-                    let end_index = captures["end_index"].parse::<u64>().unwrap();
+                    let Some(mut start_index) = IndexType::from_str(&captures["start_index"]) else {
+                        return Err(Error::new(ErrorKind::Other, "Index couldn't be parsed"));
+                    };
+                    let Some(mut end_index) = IndexType::from_str(&captures["end_index"]) else {
+                        return Err(Error::new(ErrorKind::Other, "Index couldn't be parsed"));
+                    };
+
+                    if start_index == IndexType::Wildcard {
+                        start_index = IndexType::Index(0);
+                    }
+                    if end_index == IndexType::Wildcard {
+                        end_index = IndexType::Index(db_settings.tables.get(&table_name).unwrap().biggest_id);
+                    }
 
                     if start_index >= end_index {
                         return Err(Error::new(ErrorKind::Other, "Range not possible"));
                     }
 
-                    for index in start_index..=end_index {
+                    let Ok(range) = start_index.into_range_inclusive(end_index) else {
+                        return Err(Error::new(ErrorKind::Other, "Range creation failed"));
+                    };
+                    for index in range {
                         indexes.push(IndexType::Index(index));
                     }
                     break;
                 },
-                None => {
-                    if index_str.parse::<u64>().is_err() {
-                        return Err(Error::new(ErrorKind::Other, "Range syntax incorrect"));
-                    }
-                },
+                None => (),
             }
         }
 
-        indexes.push(IndexType::Index(index_str.parse().unwrap())) // safe to assume capture is digit as regex statment makes sure of that
+        let Some(index) = IndexType::from_str(index_str) else {
+            return Err(Error::new(ErrorKind::Other, "index couldn't be parsed"));
+        };
+        if i != 0 && index == IndexType::Wildcard {
+            return Err(Error::new(ErrorKind::InvalidInput, "Wildcard can only be used as the first index"));
+        }
+        if index == IndexType::Wildcard {
+            indexes.push(index);
+            break;
+        }
+
+        indexes.push(index)
     }
 
     // Possibly temporary solution until I come up with a better regex
@@ -102,7 +161,7 @@ pub fn parse_query(query_str: &str) -> Result<QueryResult> {
     }
 
     Ok(QueryResult {
-        table_name: captures["table_name"].to_string(),
+        table_name: table_name,
         indexes: indexes,
         fn_name: captures["function_name"].to_string(),
         fn_params: fn_params,

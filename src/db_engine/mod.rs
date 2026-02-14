@@ -136,7 +136,7 @@ impl DBEngine {
         }
     }
     pub fn query(&mut self, query: &str) -> DBResult {
-        let query = match query::parse_query(query) {
+        let query = match query::parse_query(query, &self.db_settings) {
             Ok(query) => query,
             Err(e) => {
                 println!("Query parse error: {e}");
@@ -145,10 +145,6 @@ impl DBEngine {
         };
 
         println!("{query}");
-
-        if !self.db_settings.table_exists(&query.table_name) {
-            return DBResult::Error(Error::new(ErrorKind::NotFound, "Table doesn't exist'"));
-        }
 
         let Some(main_function) = self.functions.get(&query.fn_name) else {
             return DBResult::Error(Error::new(ErrorKind::NotFound, "Function not found"));
