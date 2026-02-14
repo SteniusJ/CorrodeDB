@@ -2,6 +2,7 @@ use regex::Regex;
 use std::io::{Result, Error, ErrorKind};
 use crate::{file, query, meta, db_engine};
 use std::collections::HashMap;
+use std::cmp::Ordering;
 
 /// Splits str by char ignoring those that have been escaped
 pub fn escape_split(input: &str, split_char: char) -> Vec<&str> {
@@ -196,60 +197,40 @@ pub fn merge_sort(data: &mut Vec<HashMap<String, db_engine::DBDatatype>>, sort_o
 
 fn merge(data: &mut Vec<HashMap<String, db_engine::DBDatatype>>, sort_order: &str, sort_column: &str, mut start: usize, mut mid: usize, end: usize) -> Result<()>{
     let mut start2 = mid + 1;
-
-    match sort_order {
-        "asc" => {
-            if data[mid].get(sort_column).unwrap() <= data[start2].get(sort_column).unwrap() {
-                return Ok(());
-            }
-
-            while start <= mid && start2 <= end {
-                println!("{start}, {mid}, {end}");
-                if data[start].get(sort_column).unwrap() <= data[start2].get(sort_column).unwrap() {
-                    start += 1;
-                } else {
-                    let value = data[start2].clone();
-                    let mut index = start2;
-
-                    while index != start {
-                        data[index] = data[index - 1].clone();
-                        index -= 1;
-                    }
-                    data[start] = value;
-
-                    start += 1;
-                    mid += 1;
-                    start2 += 1;
-                }
-            }
-        },
-        "dsc" => {
-            if data[mid].get(sort_column).unwrap() >= data[start2].get(sort_column).unwrap() {
-                return Ok(());
-            }
-
-            while start <= mid && start2 <= end {
-                println!("{start}, {mid}, {end}");
-                if data[start].get(sort_column).unwrap() >= data[start2].get(sort_column).unwrap() {
-                    start += 1;
-                } else {
-                    let value = data[start2].clone();
-                    let mut index = start2;
-
-                    while index != start {
-                        data[index] = data[index - 1].clone();
-                        index -= 1;
-                    }
-                    data[start] = value;
-
-                    start += 1;
-                    mid += 1;
-                    start2 += 1;
-                }
-            }
-        },
+    let expected_order = match sort_order {
+        "asc" => Ordering::Less,
+        "dsc" => Ordering::Greater,
         ord => return Err(Error::new(ErrorKind::InvalidInput, format!("{ord} is not a valid sorting order"))),
+    };
+
+    let Some(order) = data[mid].get(sort_column).unwrap().partial_cmp(data[start2].get(sort_column).unwrap()) else {
+        return Err(Error::new(ErrorKind::Other, "not reachable"));
+    };
+    if order == expected_order || order == Ordering::Equal {
+        return Ok(());
     }
 
+    while start <= mid && start2 <= end {
+        let Some(order) = data[start].get(sort_column).unwrap().partial_cmp(data[start2].get(sort_column).unwrap()) else {
+            return Err(Error::new(ErrorKind::Other, "not reachable"));
+        };
+        if order == expected_order || order == Ordering::Equal {
+            start += 1;
+        } else {
+            let value = data[start2].clone();
+            let mut index = start2;
+
+            while index != start {
+                data[index] = data[index - 1].clone();
+                index -= 1;
+            }
+            data[start] = value;
+
+            start += 1;
+            mid += 1;
+            start2 += 1;
+        }
+    }
+ 
     Ok(())
 }
