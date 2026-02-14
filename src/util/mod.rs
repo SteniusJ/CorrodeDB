@@ -197,13 +197,14 @@ pub fn merge_sort(data: &mut Vec<HashMap<String, db_engine::DBDatatype>>, sort_o
 fn merge(data: &mut Vec<HashMap<String, db_engine::DBDatatype>>, sort_order: &str, sort_column: &str, mut start: usize, mut mid: usize, end: usize) -> Result<()>{
     let mut start2 = mid + 1;
 
-    if data[mid].get(sort_column).unwrap() <= data[start2].get(sort_column).unwrap() {
-        return Ok(());
-    }
+    match sort_order {
+        "asc" => {
+            if data[mid].get(sort_column).unwrap() <= data[start2].get(sort_column).unwrap() {
+                return Ok(());
+            }
 
-    while start <= mid && start2 <= end {
-        match sort_order {
-            "asc" => {
+            while start <= mid && start2 <= end {
+                println!("{start}, {mid}, {end}");
                 if data[start].get(sort_column).unwrap() <= data[start2].get(sort_column).unwrap() {
                     start += 1;
                 } else {
@@ -220,8 +221,15 @@ fn merge(data: &mut Vec<HashMap<String, db_engine::DBDatatype>>, sort_order: &st
                     mid += 1;
                     start2 += 1;
                 }
-            },
-            "dsc" => {
+            }
+        },
+        "dsc" => {
+            if data[mid].get(sort_column).unwrap() >= data[start2].get(sort_column).unwrap() {
+                return Ok(());
+            }
+
+            while start <= mid && start2 <= end {
+                println!("{start}, {mid}, {end}");
                 if data[start].get(sort_column).unwrap() >= data[start2].get(sort_column).unwrap() {
                     start += 1;
                 } else {
@@ -238,9 +246,10 @@ fn merge(data: &mut Vec<HashMap<String, db_engine::DBDatatype>>, sort_order: &st
                     mid += 1;
                     start2 += 1;
                 }
-            },
-            ord => return Err(Error::new(ErrorKind::InvalidInput, format!("{ord} is not a valid sorting order"))),
-        }
+            }
+        },
+        ord => return Err(Error::new(ErrorKind::InvalidInput, format!("{ord} is not a valid sorting order"))),
     }
+
     Ok(())
 }
