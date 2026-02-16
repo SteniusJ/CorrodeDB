@@ -29,13 +29,27 @@ impl PartialOrd for IndexType {
 }
 
 impl IndexType {
-    fn from_str(from: &str) -> Option<IndexType> {
+    fn from_str(from: &str, table_settings: &meta::TableSettings) -> Option<IndexType> {
         if from == "*" {
             return Some(IndexType::Wildcard);
         }
         if let Ok(v) = from.parse::<u64>() {
             return Some(IndexType::Index(v));
         }
+        let subtract_split: Vec<&str> = from.split("-").collect();
+        if subtract_split.len() == 2 {
+            if let (_, Ok(val_2)) = (subtract_split[0] == "*", subtract_split[1].parse::<u64>()) {
+                let val_1 = table_settings.biggest_id;
+                if val_1 > val_2 {
+                    return Some(IndexType::Index(val_1 - val_2));
+                }
+            }
+            if let (Ok(val_1), Ok(val_2)) = (subtract_split[0].parse::<u64>(), subtract_split[1].parse::<u64>()) {
+                if val_1 > val_2 {
+                    return Some(IndexType::Index(val_1 - val_2));
+                }
+            }
+        } 
         None
     }
     fn into_range_inclusive(self, to: IndexType) -> Result<RangeInclusive<u64>> {
@@ -72,13 +86,14 @@ impl fmt::Display for QueryResult {
 
 /// Parses database query
 pub fn parse_query(query_str: &str, db_settings: &meta::DBSettings) -> Result<QueryResult> {
-    let re = Regex::new(r"(?<table_name>[[:alnum:]]*)\[(?<index>[[:digit:],.*]*)\] ?(?<function_name>[[:alnum:]]*) ?(?<function_params>[[:ascii:]]*)\)?").unwrap();
+    let re = Regex::new(r"(?<table_name>[[:alnum:]]*)\[(?<index>[[:digit:],.*-]*)\] ?(?<function_name>[[:alnum:]]*) ?(?<function_params>[[:ascii:]]*)\)?").unwrap();
 
     let Some(captures) = re.captures(query_str) else {
         return Err(Error::new(ErrorKind::NotFound, "No captures found"));
     };
 
     let table_name = captures["table_name"].to_string();
+    let table_settings = db_settings.tables.get(&table_name).unwrap();
 
     if !db_settings.table_exists(&table_name) {
         return Err(Error::new(ErrorKind::InvalidInput, format!("Table {} doesn't exist", &captures["table_name"])))
@@ -88,13 +103,13 @@ pub fn parse_query(query_str: &str, db_settings: &meta::DBSettings) -> Result<Qu
 
     for (i, index_str) in captures["index"].split(",").enumerate() {
         if i == 0 {
-            let range_re = Regex::new(r"(?<start_index>[[:digit:]*]*)\.\.(?<end_index>[[:digit:]*]*)").unwrap();
+            let range_re = Regex::new(r"(?<start_index>[[:digit:]*-]*)\.\.(?<end_index>[[:digit:]*-]*)").unwrap();
             match range_re.captures(index_str) {
                 Some(captures) => {
-                    let Some(mut start_index) = IndexType::from_str(&captures["start_index"]) else {
+                    let Some(mut start_index) = IndexType::from_str(&captures["start_index"], table_settings) else {
                         return Err(Error::new(ErrorKind::Other, "Index couldn't be parsed"));
                     };
-                    let Some(mut end_index) = IndexType::from_str(&captures["end_index"]) else {
+                    let Some(mut end_index) = IndexType::from_str(&captures["end_index"], table_settings) else {
                         return Err(Error::new(ErrorKind::Other, "Index couldn't be parsed"));
                     };
 
@@ -121,7 +136,7 @@ pub fn parse_query(query_str: &str, db_settings: &meta::DBSettings) -> Result<Qu
             }
         }
 
-        let Some(index) = IndexType::from_str(index_str) else {
+        let Some(index) = IndexType::from_str(index_str, table_settings) else {
             return Err(Error::new(ErrorKind::Other, "index couldn't be parsed"));
         };
         if i != 0 && index == IndexType::Wildcard {
