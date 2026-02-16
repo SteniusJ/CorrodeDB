@@ -80,14 +80,21 @@ pub fn where_from_db(data: &mut Vec<HashMap<String, DBDatatype>>, query: &query:
         DBDatatype::from_str(&comparison_value)
     };
 
-    for (index, db_row) in data.clone().into_iter().enumerate() {
-        let column_data = db_row.get(&column).unwrap();
+    let mut index: usize = 0;
+    while data.len() > index {
+        let column_data = data[index].get(&column).unwrap();
+
+        if !column_data.compare_type(&comparison_value) {
+            return Err(Error::new(ErrorKind::InvalidInput, "Comparison value type and column value type do not match"));
+        }
 
         match is_matching(column_data, &comparison_value, &operator) {
             Ok(matching) => {
                 if !matching {
                     data.remove(index);
+                    continue;
                 }
+                index += 1;
             },
             Err(e) => return Err(e),
         }

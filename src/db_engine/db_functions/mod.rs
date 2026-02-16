@@ -116,11 +116,16 @@ pub fn write_to_db(db_settings: &mut meta::DBSettings, file_system: &mut file::F
                 };
 
                 if file_data.len() > line as usize {
+                    println!("wrote to line {line}");
                     file_data[line as usize] = util::sanitize_db_entry(query.fn_params.join(","));
                 } else {
                     return Err(Error::new(ErrorKind::Other, "Attempting to write outside index bounds"));
                 }
 
+                match file_system.write_to_cache(&file_name, file_data.join("\n")) {
+                    Ok(_) => (),
+                    Err(e) => return Err(e),
+                }
                 affected_indexes.push(index as i64);
             },
             query::IndexType::Wildcard => {
@@ -172,7 +177,12 @@ pub fn remove_from_db(db_settings: &mut meta::DBSettings, file_system: &mut file
                     return Err(Error::new(ErrorKind::Other, "File read error"));
                 };
 
-                file_data.insert(line as usize, String::new()); // Overwrite current value with empty String
+                file_data[line as usize] = String::new(); // Overwrite current value with empty String
+
+                match file_system.write_to_cache(&file_name, file_data.join("\n")) {
+                    Ok(_) => (),
+                    Err(e) => return Err(e),
+                }
                 affected_indexes.push(index as i64);
             },
             query::IndexType::Wildcard => {

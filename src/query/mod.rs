@@ -4,6 +4,7 @@ use std::option::Option;
 use std::fmt;
 use crate::{util, meta};
 use std::ops::RangeInclusive;
+use std::collections::HashMap;
 
 #[derive(Debug, PartialEq)]
 pub enum IndexType {
@@ -93,11 +94,11 @@ pub fn parse_query(query_str: &str, db_settings: &meta::DBSettings) -> Result<Qu
     };
 
     let table_name = captures["table_name"].to_string();
-    let table_settings = db_settings.tables.get(&table_name).unwrap();
 
     if !db_settings.table_exists(&table_name) {
         return Err(Error::new(ErrorKind::InvalidInput, format!("Table {} doesn't exist", &captures["table_name"])))
     }
+    let table_settings = db_settings.tables.get(&table_name).unwrap();
 
     let mut indexes: Vec<IndexType> = Vec::new();
 
@@ -191,7 +192,17 @@ mod tests {
 
     #[test]
     fn test_query_parse() {
-        assert_eq!(parse_query(r"test[1,2,3,4] write 3n1298ud8h9apb,sksdo\,kdskd | test dsadija,daisdoi").unwrap(), QueryResult {
+        let mut table_map = HashMap::new();
+        table_map.insert(String::from("test"), meta::TableSettings{
+            columns: Vec::new(),
+            biggest_id: 6,
+        });
+        let db_settings = meta::DBSettings {
+            tables: table_map,
+            compartment_rows: 10,
+        };
+
+        assert_eq!(parse_query(r"test[1,2,3,4] write 3n1298ud8h9apb,sksdo\,kdskd | test dsadija,daisdoi", &db_settings).unwrap(), QueryResult {
             table_name: String::from("test"),
             indexes: vec![IndexType::Index(1),IndexType::Index(2),IndexType::Index(3),IndexType::Index(4)],
             fn_name: String::from("write"),
@@ -199,7 +210,7 @@ mod tests {
             sub_fn_names: vec![String::from("test")],
             sub_fn_params: vec![vec![String::from("dsadija"),String::from("daisdoi")]],
         });
-        assert_eq!(parse_query("test[*] | test thingy | othertest thingy,1").unwrap(), QueryResult {
+        assert_eq!(parse_query("test[*] | test thingy | othertest thingy,1", &db_settings).unwrap(), QueryResult {
             table_name: String::from("test"),
             indexes: vec![IndexType::Wildcard],
             fn_name: String::new(),
@@ -207,7 +218,7 @@ mod tests {
             sub_fn_names: vec![String::from("test"), String::from("othertest")],
             sub_fn_params: vec![vec![String::from("thingy")], vec![String::from("thingy"), String::from("1")]],
         });
-        assert_eq!(parse_query("test[1..5]").unwrap(), QueryResult {
+        assert_eq!(parse_query("test[1..5]", &db_settings).unwrap(), QueryResult {
             table_name: String::from("test"),
             indexes: vec![IndexType::Index(1),IndexType::Index(2),IndexType::Index(3),IndexType::Index(4),IndexType::Index(5)],
             fn_name: String::new(),
@@ -215,8 +226,26 @@ mod tests {
             sub_fn_names: Vec::new(),
             sub_fn_params: Vec::new(),
         });
-        parse_query("test 1 dsadsa i").expect_err("Succeeded in parsing incorrect query");
-        parse_query("test[1.2]").expect_err("Succeeded in parsing incorrect query");
-        parse_query("test[1,m,5,ia,4]").expect_err("Succeeded in parsing incorrect query");
+        assert_eq!(parse_query("test[1..*]", &db_settings).unwrap(), QueryResult {
+            table_name: String::from("test"),
+            indexes: vec![IndexType::Index(1),IndexType::Index(2),IndexType::Index(3),IndexType::Index(4),IndexType::Index(5),IndexType::Index(6)],
+            fn_name: String::new(),
+            fn_params: vec![String::new()],
+            sub_fn_names: Vec::new(),
+            sub_fn_params: Vec::new(),
+        });
+        assert_eq!(parse_query("test[1..*-1]", &db_settings).unwrap(), QueryResult {
+            table_name: String::from("test"),
+            indexes: vec![IndexType::Index(1),IndexType::Index(2),IndexType::Index(3),IndexType::Index(4),IndexType::Index(5)],
+            fn_name: String::new(),
+            fn_params: vec![String::new()],
+            sub_fn_names: Vec::new(),
+            sub_fn_params: Vec::new(),
+        });
+        parse_query("test 1 dsadsa i", &db_settings).expect_err("Succeeded in parsing incorrect query");
+        parse_query("test[1.2]", &db_settings).expect_err("Succeeded in parsing incorrect query");
+        parse_query("test[1,m,5,ia,4]", &db_settings).expect_err("Succeeded in parsing incorrect query");
+        parse_query("test[0..*-10]", &db_settings).expect_err("Succeeded in parsing incorrect query");
+        parse_query("test[0-10]", &db_settings).expect_err("Succeeded in parsing incorrect query");
     }
 }

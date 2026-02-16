@@ -48,6 +48,28 @@ impl DBDatatype {
             return false;
         }
     }
+    pub fn compare_type(&self, other: &Self) -> bool {
+        match self {
+            DBDatatype::NumberI(_) => {
+                if let DBDatatype::NumberI(_) = other {
+                    return true;
+                }
+                return false;
+            },
+            DBDatatype::NumberF(_) => {
+                if let DBDatatype::NumberF(_) = other {
+                    return true;
+                }
+                return false;
+            },
+            DBDatatype::VarChar(_) => {
+                if let DBDatatype::VarChar(_) = other {
+                    return true;
+                }
+                return false;
+            },
+        }
+    }
 }
 
 impl PartialEq for DBDatatype {
@@ -110,6 +132,33 @@ pub enum DBResult {
     Data(Vec<HashMap<String, DBDatatype>>),
     Status((String, Vec<i64>)),
     Error(Error),
+}
+
+impl DBResult {
+    pub fn expect_err(self, error_message: &str) {
+        match  self {
+            DBResult::Error(_) => (),
+            _ => panic!("{error_message}"),
+        }
+    }
+    pub fn into_vec(self) -> Option<Vec<HashMap<String, DBDatatype>>> {
+        if let DBResult::Data(vec) = self {
+            return Some(vec);
+        }
+        None
+    }
+    pub fn into_tuple(self) -> Option<(String, Vec<i64>)> {
+        if let DBResult::Status(status) = self {
+            return Some(status);
+        }
+        None
+    }
+    pub fn into_error(self) -> Option<Error> {
+        if let DBResult::Error(error) = self {
+            return Some(error);
+        }
+        None
+    }
 }
 
 #[derive(Debug)]
