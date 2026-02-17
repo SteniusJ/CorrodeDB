@@ -4,7 +4,6 @@ use std::option::Option;
 use std::fmt;
 use crate::{util, meta};
 use std::ops::RangeInclusive;
-use std::collections::HashMap;
 
 #[derive(Debug, PartialEq)]
 pub enum IndexType {
