@@ -29,14 +29,21 @@ pub fn random_from_db(data: &mut Vec<HashMap<String, DBDatatype>>, _query: &quer
 
     let mut rng = rand::rng();
     let Ok(nr_of_random_values) = params[0].parse::<u64>() else {
+        if params[0] == "*" {
+            data.shuffle(&mut rng);
+            return Ok(());
+        }
         return Err(Error::new(ErrorKind::InvalidInput, "Incorrect parameter type for random function"));
     };
 
-    if data.len() <= nr_of_random_values as usize {
-        return Err(Error::new(ErrorKind::InvalidInput, "Attempting to retrieve more or the same amount of values that the query includes"));
+    if data.len() < nr_of_random_values as usize {
+        return Err(Error::new(ErrorKind::InvalidInput, "Attempting to retrieve more values than the query includes"));
     }
 
     data.shuffle(&mut rng);
+    if data.len() == nr_of_random_values as usize {
+        return Ok(())
+    }
     data.truncate(nr_of_random_values as usize);
 
     Ok(())
