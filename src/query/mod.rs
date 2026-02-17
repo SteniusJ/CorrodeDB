@@ -39,10 +39,12 @@ impl IndexType {
         }
         let subtract_split: Vec<&str> = from.split("-").collect();
         if subtract_split.len() == 2 {
-            if let (_, Ok(val_2)) = (subtract_split[0] == "*", subtract_split[1].parse::<u64>()) {
-                let val_1 = table_settings.biggest_id;
-                if val_1 > val_2 {
-                    return Some(IndexType::Index(val_1 - val_2));
+            if let (is_wildcard, Ok(val_2)) = (subtract_split[0] == "*", subtract_split[1].parse::<u64>()) {
+                if is_wildcard {
+                    let val_1 = table_settings.biggest_id;
+                    if val_1 > val_2 {
+                        return Some(IndexType::Index(val_1 - val_2));
+                    }
                 }
             }
             if let (Ok(val_1), Ok(val_2)) = (subtract_split[0].parse::<u64>(), subtract_split[1].parse::<u64>()) {

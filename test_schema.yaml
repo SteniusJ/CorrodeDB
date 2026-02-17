@@ -19,4 +19,4 @@ tables:
 settings:
   compartment:
     rows: 5
-  password: Test
+  password: TestPassword

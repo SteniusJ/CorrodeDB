@@ -22,7 +22,7 @@ fn test_queries() {
      * Test incorrect function inputs
      */
     // Test where 
-    single_query(TEST_SCHEMA_PATH, "read[*] |where nosuchcol,=,10").expect_err("where returned ok when no such column exists");
+    single_query(TEST_SCHEMA_PATH, "read[*] | where nosuchcol,=,10").expect_err("where returned ok when no such column exists");
     single_query(TEST_SCHEMA_PATH, "read[*] | where int,in,hello world").expect_err("where returned ok when given non matching operator value pair");
     // single_query(TEST_SCHEMA_PATH, "read[*] where int,=,hello world").expect_err("where returned ok when given non matching column value and comparison value");
     single_query(TEST_SCHEMA_PATH, "read[*] | where int,>").expect_err("where returned ok when given incorrect number of parameters");
@@ -45,6 +45,8 @@ fn test_queries() {
     let result = single_query(TEST_SCHEMA_PATH, "read[3..6]").into_vec().unwrap();
     assert_eq!(result.len(), 4);
     assert_eq!(result[0].get("int").unwrap().as_i64().unwrap(), 3);
+    assert_eq!(single_query(TEST_SCHEMA_PATH, "read[*-1]").into_vec().unwrap()[0].get("int").unwrap().as_i64().unwrap(), 5);
+    assert_eq!(single_query(TEST_SCHEMA_PATH, "read[0..*-3]").into_vec().unwrap()[3].get("int").unwrap().as_i64().unwrap(), 3);
     // Test read sort
     assert_eq!(single_query(TEST_SCHEMA_PATH, "read[*] | sort float,asc").into_vec().unwrap()[2].get("float").unwrap().as_f64().unwrap(), 2.1);
     assert_eq!(single_query(TEST_SCHEMA_PATH, "read[*] | sort int,dsc").into_vec().unwrap()[4].get("int").unwrap().as_i64().unwrap(), 2);
