@@ -8,7 +8,7 @@ mod db_engine;
 
 use std::env;
 use std::collections::HashMap;
-use std::io::{stdin, Result};
+use std::io::{stdin};
 
 const DEFAULT_SCHEMA_FILE_PATH: &str = "./schema.yaml";
 const DEFAULT_PORT: &str = "4067";
@@ -144,9 +144,13 @@ pub fn start_database(schema_path: &str, port: &str) {
 
     http_server.add_endpoint("/", http::HTTPRequestMethods::POST, |body, _url_params| {
         match db_engine.query(&body) {
-            Ok(result) => return http::create_http_response(200, "application/json",  &encode_db_return(result)),
-            Err(e) if e.kind() == std::io::ErrorKind::Other => return http::create_http_response(200, "application/json",  &json::encode(vec![("status", json::JSONValue::String(format!("{e}")))])),
-            Err(e) => return http::create_http_response(400, "application/json",  &json::encode(vec![("error", json::JSONValue::String(format!("{e}")))])),
+            db_engine::DBResult::Data(result) => return http::create_http_response(200, "application/json",  &encode_db_return(result)),
+            db_engine::DBResult::Status((status, affected_rows)) => return http::create_http_response(
+                200,
+                "application/json",
+                &json::encode(vec![("status", json::JSONValue::String(format!("{status}"))), ("affected_rows", affected_rows.into())])
+            ),
+            db_engine::DBResult::Error(e) => return http::create_http_response(400, "application/json",  &json::encode(vec![("error", json::JSONValue::String(format!("{e}")))])),
         }
     });
 
@@ -164,8 +168,9 @@ pub fn start_databese_console_queries_mode(schema_path: &str) {
         query = query.trim().to_string();
 
         match db_engine.query(&query) {
-            Ok(result) => println!("{}", util::db_result_prettify(result)),
-            Err(e) => println!("{e}"),
+            db_engine::DBResult::Data(result) => println!("{}", util::db_result_prettify(result)),
+            db_engine::DBResult::Status((status, affected_rows)) => println!("{status} affected rows: {affected_rows:?}"),
+            db_engine::DBResult::Error(e) => println!("{e}"),
         }
     }
 }
@@ -173,7 +178,7 @@ pub fn start_databese_console_queries_mode(schema_path: &str) {
 /// Single query mode
 /// Mostly implemented for integration tests but may be used in the future
 /// for a single query application mode.
-pub fn single_query(schema_path: &str, query: &str) -> Result<Vec<HashMap<String, db_engine::DBDatatype>>> {
+pub fn single_query(schema_path: &str, query: &str) -> db_engine::DBResult {
     let mut db_engine = db_engine::DBEngine::new(schema_path);
     db_engine.query(query)
 }

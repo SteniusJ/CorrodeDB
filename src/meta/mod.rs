@@ -72,6 +72,9 @@ impl DBSettings {
     pub fn iterate_id(&mut self, table_name: &String) {
         self.tables.get_mut(table_name).unwrap().iterate_id();
     }
+    pub fn reset_id(&mut self, table_name: &String) {
+        self.tables.get_mut(table_name).unwrap().biggest_id = 0;
+    }
 }
 
 impl TableSettings {
