@@ -48,6 +48,9 @@ fn test_queries() {
     // Test read sort
     assert_eq!(single_query(TEST_SCHEMA_PATH, "read[*] | sort float,asc").into_vec().unwrap()[2].get("float").unwrap().as_f64().unwrap(), 2.1);
     assert_eq!(single_query(TEST_SCHEMA_PATH, "read[*] | sort int,dsc").into_vec().unwrap()[4].get("int").unwrap().as_i64().unwrap(), 2);
+    // Test read with stacked sub functions
+    let result = single_query(TEST_SCHEMA_PATH, "read[*] | sort int,dsc | where int,>,2 | random 3 | sort string,asc | random 1").into_vec().unwrap()[0].get("int").unwrap().as_i64().unwrap();
+    assert!(result > 2, "result: {result} was less than 2 even when that shouldn't be possible");
 
     // Test write
     /*
