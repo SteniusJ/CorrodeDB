@@ -36,22 +36,12 @@ pub fn sanitize_db_entry(input: String) -> String {
     for char in input.chars() {
         match char {
             '\n' => sanitized_string.push_str(r"\n"),
-            '"' => sanitized_string.push_str("\""),
+            '"' => sanitized_string.push_str("\\\""),
+            '\r' => sanitized_string.push_str(r"\r"),
             char => sanitized_string.push(char),
         }
     }
     sanitized_string
-}
-
-pub fn rehydrate_db_entry(input: String) -> String {
-    let mut rehydrated_string = String::new();
-    for char in input.chars() {
-        match char {
-            '\\' => (),
-            char => rehydrated_string.push(char),
-        }
-    }
-    rehydrated_string
 }
 
 /// Parses program arguments
