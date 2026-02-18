@@ -6,6 +6,8 @@ use crate::{util, meta};
 use std::ops::RangeInclusive;
 use std::collections::HashMap;
 
+mod tokenizer;
+
 #[derive(Debug, PartialEq)]
 pub enum IndexType {
     Index(u64),
@@ -87,6 +89,8 @@ impl fmt::Display for QueryResult {
 
 /// Parses database query
 pub fn parse_query(query_str: &str, db_settings: &meta::DBSettings) -> Result<QueryResult> {
+    println!("{:?}", tokenizer::tokenize(query_str));
+
     let re = Regex::new(r"(?<table_name>[[:alnum:]]*)\[(?<index>[[:digit:],.*-]*)\] ?(?<function_name>[[:alnum:]]*) ?(?<function_params>[[:ascii:]]*)\)?").unwrap();
 
     let Some(captures) = re.captures(query_str) else {

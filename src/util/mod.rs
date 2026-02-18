@@ -3,6 +3,7 @@ use std::io::{Result, Error, ErrorKind};
 use crate::{file, query, meta, db_engine};
 use std::collections::HashMap;
 use std::cmp::Ordering;
+use std::collections::HashSet;
 
 /// Splits str by char ignoring those that have been escaped
 pub fn escape_split(input: &str, split_char: char) -> Vec<&str> {
@@ -28,6 +29,61 @@ pub fn escape_split(input: &str, split_char: char) -> Vec<&str> {
     }
 
     splits.push(input.get(last_split_i..input.len()).unwrap());
+    splits
+}
+
+/// Splits str by set of chars, ignoring those that have been escaped
+pub fn escape_split_by_many(input: &str, split_set: HashSet<char>) -> Vec<&str> {
+    let mut skip = false;
+    let mut building_string = false;
+    let mut building_string_proc = false;
+    let mut last_split_i = 0;
+    let mut splits: Vec<&str> = Vec::new();
+
+    for (index, char) in input.chars().enumerate() {
+        if skip {
+            skip = false;
+            continue;
+        }
+        
+        if char == '\\' {
+            skip = true;
+            continue;
+        }
+
+        if char == '"' {
+            if building_string {
+                building_string = false;
+            } else {
+                building_string = true;
+                building_string_proc = true;
+            }
+            continue;
+        }
+
+        if split_set.get(&char).is_some() && !building_string {
+            let split: &str;
+            if building_string_proc {
+                split = input.get(last_split_i+1..index-1).unwrap();
+            } else {
+                split = input.get(last_split_i..index).unwrap();
+            }
+            if !split.is_empty() {
+                splits.push(split);
+            }
+            last_split_i = index + 1;
+            building_string_proc = false;
+        }
+    }
+    let split: &str;
+    if building_string_proc {
+        split = input.get(last_split_i+1..input.len()-1).unwrap();
+    } else {
+        split = input.get(last_split_i..input.len()).unwrap();
+    }
+    if !split.is_empty() {
+        splits.push(split);
+    }
     splits
 }
 
