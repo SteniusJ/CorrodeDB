@@ -44,6 +44,10 @@ pub fn sanitize_db_entry(input: String) -> String {
     sanitized_string
 }
 
+pub fn rehydrate_db_entry(input: String) -> String {
+    input.replace("\\,", ",")
+}
+
 /// Parses program arguments
 pub fn parse_program_args(args: Vec<String>) -> Vec<(String, String)>{
     let arguments_string = args.join(" ");
