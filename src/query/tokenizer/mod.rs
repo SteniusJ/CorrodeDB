@@ -8,7 +8,7 @@ pub enum Token {
     Integer(i64),
     FloatingPoint(f64),
     Page(u64),
-    Wildcard,
+    Wildcard(u64), // value for wildcard is modifier, if it is 10 it equates to *-10
     BiggerThen,
     LessThen,
     Equals,
@@ -34,7 +34,7 @@ pub fn tokenize(input: &str) -> Vec<Token> {
             "asc" => tokens.push(Token::SortAscending),
             "dsc" => tokens.push(Token::SortDescending),
             "in" => tokens.push(Token::Includes),
-            "*" => tokens.push(Token::Wildcard),
+            "*" => tokens.push(Token::Wildcard(0)),
             part => {
                 if let Ok(number) = part.parse::<i64>() {
                     tokens.push(Token::Integer(number));
@@ -42,6 +42,10 @@ pub fn tokenize(input: &str) -> Vec<Token> {
                 }
                 if let Ok(number) = part.parse::<f64>() {
                     tokens.push(Token::FloatingPoint(number));
+                    continue;
+                }
+                if let Some(token) = try_subtraction(part) {
+                    tokens.push(token);
                     continue;
                 }
                 if let Some(page) = try_into_page(part) {
@@ -85,5 +89,24 @@ fn try_into_page(input: &str) -> Option<Token> {
     if let Ok(index) = index_string.parse::<u64>() {
         return Some(Token::Page(index));
     }
+    None
+}
+
+fn try_subtraction(input: &str) -> Option<Token> {
+    let subtraction_split: Vec<&str> = input.split("-").collect();
+    if subtraction_split.len() != 2 {
+        return None;
+    }
+    if let Ok(subtractor) = subtraction_split[1].parse::<u64>() {
+        if subtraction_split[0] == "*" {
+            return Some(Token::Wildcard(subtractor));
+        }
+        if let Ok(subtractee) = subtraction_split[0].parse::<u64>() {
+            if subtractee > subtractor {
+                return Some(Token::Integer(subtractee as i64 - subtractor as i64));
+            }
+        }
+    }
+
     None
 }
