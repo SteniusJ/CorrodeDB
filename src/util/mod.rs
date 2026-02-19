@@ -231,7 +231,7 @@ pub fn db_result_prettify(result: Vec<HashMap<String, db_engine::DBDatatype>>) -
     pretty_string
 }
 
-pub fn merge_sort(data: &mut Vec<HashMap<String, db_engine::DBDatatype>>, sort_order: &str, sort_column: &str, left: usize, right: usize) -> Result<()> {
+pub fn merge_sort(data: &mut Vec<HashMap<String, db_engine::DBDatatype>>, sort_order: &query::tokenizer::Token, sort_column: &str, left: usize, right: usize) -> Result<()> {
     if data.len() <= 1 {
         return Ok(())
     }
@@ -239,10 +239,10 @@ pub fn merge_sort(data: &mut Vec<HashMap<String, db_engine::DBDatatype>>, sort_o
     if left < right {
         let mid = left + (right - left) / 2;
 
-        merge_sort(data, sort_order, sort_column, left, mid).unwrap();
-        merge_sort(data, sort_order, sort_column, mid + 1, right).unwrap();
+        merge_sort(data, &sort_order, sort_column, left, mid).unwrap();
+        merge_sort(data, &sort_order, sort_column, mid + 1, right).unwrap();
 
-        match merge(data, sort_order, sort_column, left, mid, right) {
+        match merge(data, &sort_order, sort_column, left, mid, right) {
             Ok(_) => (),
             Err(e) => return Err(e),
         }
@@ -251,12 +251,12 @@ pub fn merge_sort(data: &mut Vec<HashMap<String, db_engine::DBDatatype>>, sort_o
     Ok(())
 }
 
-fn merge(data: &mut Vec<HashMap<String, db_engine::DBDatatype>>, sort_order: &str, sort_column: &str, mut start: usize, mut mid: usize, end: usize) -> Result<()>{
+fn merge(data: &mut Vec<HashMap<String, db_engine::DBDatatype>>, sort_order: &query::tokenizer::Token, sort_column: &str, mut start: usize, mut mid: usize, end: usize) -> Result<()>{
     let mut start2 = mid + 1;
     let expected_order = match sort_order {
-        "asc" => Ordering::Less,
-        "dsc" => Ordering::Greater,
-        ord => return Err(Error::new(ErrorKind::InvalidInput, format!("{ord} is not a valid sorting order"))),
+        query::tokenizer::Token::SortAscending => Ordering::Less,
+        query::tokenizer::Token::SortDescending => Ordering::Greater,
+        ord => return Err(Error::new(ErrorKind::InvalidInput, format!("{ord:?} is not a valid sorting order"))),
     };
 
     let Some(order) = data[mid].get(sort_column).unwrap().partial_cmp(data[start2].get(sort_column).unwrap()) else {

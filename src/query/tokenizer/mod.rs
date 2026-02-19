@@ -2,7 +2,7 @@ use std::collections::HashSet;
 use std::option::Option;
 use crate::{util};
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum Token {
     String(String),
     Integer(i64),
@@ -17,6 +17,74 @@ pub enum Token {
     SortAscending,
     SortDescending,
     Range((u64, u64)),
+}
+
+impl Token {
+    pub fn is_valid_index(&self) -> bool {
+        match self {
+            Token::Integer(self_v) => {
+                if self_v >= &0 {
+                    true
+                } else {
+                    false
+                }
+            },
+            Token::Wildcard(_) => true,
+            Token::Range(_) => true,
+            Token::Page(_) => true,
+            _ => false,
+        }
+    }
+    pub fn is_wildcard(&self) -> bool {
+        if let Token::Wildcard(_) = self {
+            return true;
+        }
+        false
+    }
+    pub fn is_int(&self) -> bool {
+        if let Token::Integer(_) = self {
+            return true;
+        }
+        false
+    }
+    pub fn is_float(&self) -> bool {
+        if let Token::FloatingPoint(_) = self {
+            return true;
+        }
+        false
+    }
+    pub fn is_string(&self) -> bool {
+        if let Token::String(_) = self {
+            return true;
+        }
+        false
+    }
+    pub fn is_where_operator(&self) -> bool {
+        match self {
+            Token::BiggerThen => true,
+            Token::LessThen => true,
+            Token::Equals => true,
+            Token::Includes => true,
+            _ => false,
+        }
+    }
+    pub fn to_string(&self) -> String {
+        match self {
+            Token::Pipe => String::from("|"),
+            Token::Page(page) => format!("Page({page})"),
+            Token::Equals => String::from("=="),
+            Token::Range((start, end)) => format!("Range({start}..={end})"),
+            Token::String(string) => string.clone(),
+            Token::LessThen => String::from("<"),
+            Token::Includes => String::from("Includes"),
+            Token::Integer(int) => int.to_string(),
+            Token::Wildcard(modifier) => format!("*-{modifier}"),
+            Token::BiggerThen => String::from(">"),
+            Token::SortAscending => String::from("Sort(asc)"),
+            Token::SortDescending => String::from("Sort(dsc)"),
+            Token::FloatingPoint(float) => float.to_string(),
+        }
+    }
 }
 
 pub fn tokenize(input: &str) -> Vec<Token> {
