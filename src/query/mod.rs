@@ -1,8 +1,7 @@
-use regex::Regex;
 use std::io::{Result, Error, ErrorKind};
 use std::option::Option;
 use std::fmt;
-use crate::{util, meta};
+use crate::meta;
 use std::ops::RangeInclusive;
 
 pub mod tokenizer;
@@ -206,23 +205,23 @@ mod tests {
             table_name: String::from("test"),
             indexes: vec![IndexType::Index(1),IndexType::Index(2),IndexType::Index(3),IndexType::Index(4)],
             fn_name: String::from("write"),
-            fn_params: vec![String::from("3n1298ud8h9apb"),String::from(r"sksdo\,kdskd")],
+            fn_params: vec![tokenizer::Token::String(String::from("3n1298ud8h9apb")), tokenizer::Token::String(String::from(r"sksdo\,kdskd"))],
             sub_fn_names: vec![String::from("test")],
-            sub_fn_params: vec![vec![String::from("dsadija"),String::from("daisdoi")]],
+            sub_fn_params: vec![vec![tokenizer::Token::String(String::from("dsadija")), tokenizer::Token::String(String::from("daisdoi"))]],
         });
         assert_eq!(parse_query("test[*] | test thingy | othertest thingy,1", &db_settings).unwrap(), QueryResult {
             table_name: String::from("test"),
             indexes: vec![IndexType::Wildcard],
             fn_name: String::new(),
-            fn_params: vec![String::new()],
+            fn_params: vec![],
             sub_fn_names: vec![String::from("test"), String::from("othertest")],
-            sub_fn_params: vec![vec![String::from("thingy")], vec![String::from("thingy"), String::from("1")]],
+            sub_fn_params: vec![vec![tokenizer::Token::String(String::from("thingy"))], vec![tokenizer::Token::String(String::from("thingy")), tokenizer::Token::Integer(1)]],
         });
         assert_eq!(parse_query("test[1..5]", &db_settings).unwrap(), QueryResult {
             table_name: String::from("test"),
             indexes: vec![IndexType::Index(1),IndexType::Index(2),IndexType::Index(3),IndexType::Index(4),IndexType::Index(5)],
             fn_name: String::new(),
-            fn_params: vec![String::new()],
+            fn_params: vec![],
             sub_fn_names: Vec::new(),
             sub_fn_params: Vec::new(),
         });
@@ -230,7 +229,7 @@ mod tests {
             table_name: String::from("test"),
             indexes: vec![IndexType::Index(1),IndexType::Index(2),IndexType::Index(3),IndexType::Index(4),IndexType::Index(5),IndexType::Index(6)],
             fn_name: String::new(),
-            fn_params: vec![String::new()],
+            fn_params: vec![],
             sub_fn_names: Vec::new(),
             sub_fn_params: Vec::new(),
         });
@@ -238,7 +237,7 @@ mod tests {
             table_name: String::from("test"),
             indexes: vec![IndexType::Index(1),IndexType::Index(2),IndexType::Index(3),IndexType::Index(4),IndexType::Index(5)],
             fn_name: String::new(),
-            fn_params: vec![String::new()],
+            fn_params: vec![],
             sub_fn_names: Vec::new(),
             sub_fn_params: Vec::new(),
         });
