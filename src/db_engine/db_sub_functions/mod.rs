@@ -57,7 +57,7 @@ pub fn random_from_db(data: &mut Vec<HashMap<String, DBDatatype>>, _query: &quer
 ///
 /// Returns data which matches condition
 pub fn where_from_db(data: &mut Vec<HashMap<String, DBDatatype>>, query: &query::QueryResult, params: &Vec<query::tokenizer::Token>, db_settings: &meta::DBSettings) -> Result<()> {
-    let mut arguments = params.clone().into_iter();
+    let mut arguments = params.into_iter();
 
     // Assign variables necessary for conditon matching
     let column = {

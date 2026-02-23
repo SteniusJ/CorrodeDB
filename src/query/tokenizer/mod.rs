@@ -1,6 +1,6 @@
 use std::collections::HashSet;
 use std::option::Option;
-use crate::{util};
+use crate::{util, query};
 
 #[derive(Debug, PartialEq)]
 pub enum Token {
@@ -16,7 +16,7 @@ pub enum Token {
     Pipe,
     SortAscending,
     SortDescending,
-    Range((u64, u64)),
+    Range((query::IndexType, query::IndexType)),
 }
 
 impl Token {
@@ -73,7 +73,7 @@ impl Token {
             Token::Pipe => String::from("|"),
             Token::Page(page) => format!("Page({page})"),
             Token::Equals => String::from("=="),
-            Token::Range((start, end)) => format!("Range({start}..={end})"),
+            Token::Range((start, end)) => format!("Range({start:?}..={end:?})"),
             Token::String(string) => string.clone(),
             Token::LessThen => String::from("<"),
             Token::Includes => String::from("Includes"),
@@ -138,8 +138,22 @@ fn try_into_range(input: &str) -> Option<Token> {
     if range_split.len() != 2 {
         return None;
     }
-    if let (Ok(range_start), Ok(range_end)) = (range_split[0].parse::<u64>(), range_split[1].parse::<u64>()) {
+
+    if let (Some(range_start), Some(range_end)) = (index_from_str(range_split[0]), index_from_str(range_split[1])) {
         return Some(Token::Range((range_start, range_end)));
+    }
+    None
+}
+
+fn index_from_str(from: &str) -> Option<query::IndexType> {
+    if from == "*" {
+        return Some(query::IndexType::Wildcard(0));
+    }
+    if let Some(token) = try_subtraction(from) {
+        return Some(query::IndexType(token));
+    }
+    if let Ok(index) = from.parse::<i64>() {
+        return Some(Token::Integer(index));
     }
     None
 }
