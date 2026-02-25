@@ -86,7 +86,7 @@ impl TableSettings {
         }
         Err(Error::new(ErrorKind::Other, "column not found"))
     }
-    pub fn has_column(&self, column_name: &str) -> bool {
+    pub fn has_column(&self, column_name: String) -> bool {
         for column in &self.columns {
             if column.name == column_name {
                 return true;
