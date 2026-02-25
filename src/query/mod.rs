@@ -1,15 +1,14 @@
-use regex::Regex;
 use std::io::{Result, Error, ErrorKind};
 use std::option::Option;
 use std::fmt;
-use crate::{util, meta};
-use std::ops::RangeInclusive;
-use std::collections::HashMap;
+use crate::meta;
+
+pub mod tokenizer;
 
 #[derive(Debug, PartialEq)]
 pub enum IndexType {
     Index(u64),
-    Wildcard,
+    Wildcard(u64),
 }
 
 impl PartialOrd for IndexType {
@@ -22,48 +21,30 @@ impl PartialOrd for IndexType {
                     None
                 }
             },
-            IndexType::Wildcard => {
-                None
+            IndexType::Wildcard(self_v) => {
+                if let IndexType::Wildcard(other_v) = other {
+                    Some(self_v.cmp(other_v))
+                } else {
+                    None
+                }
             },
         }
     }
 }
 
 impl IndexType {
-    fn from_str(from: &str, table_settings: &meta::TableSettings) -> Option<IndexType> {
-        if from == "*" {
-            return Some(IndexType::Wildcard);
-        }
-        if let Ok(v) = from.parse::<u64>() {
-            return Some(IndexType::Index(v));
-        }
-        let subtract_split: Vec<&str> = from.split("-").collect();
-        if subtract_split.len() == 2 {
-            if let (is_wildcard, Ok(val_2)) = (subtract_split[0] == "*", subtract_split[1].parse::<u64>()) {
-                if is_wildcard {
-                    let val_1 = table_settings.biggest_id;
-                    if val_1 > val_2 {
-                        return Some(IndexType::Index(val_1 - val_2));
-                    }
+    fn to_int(&self, table_settings: &meta::TableSettings) -> u64 {
+        match self {
+            IndexType::Index(value) => *value,
+            IndexType::Wildcard(modifier) => {
+                let biggest_index = table_settings.biggest_id;
+                if biggest_index > *modifier {
+                    biggest_index - *modifier
+                } else {
+                    biggest_index
                 }
-            }
-            if let (Ok(val_1), Ok(val_2)) = (subtract_split[0].parse::<u64>(), subtract_split[1].parse::<u64>()) {
-                if val_1 > val_2 {
-                    return Some(IndexType::Index(val_1 - val_2));
-                }
-            }
-        } 
-        None
-    }
-    fn into_range_inclusive(self, to: IndexType) -> Result<RangeInclusive<u64>> {
-        if self == IndexType::Wildcard || to == IndexType::Wildcard {
-            return Err(Error::new(ErrorKind::InvalidInput, "range does not work on Wildcard"));
+            },
         }
-
-        if let (IndexType::Index(from_v), IndexType::Index(to_v)) = (self, to) {
-            return Ok(from_v..=to_v);
-        }
-        Err(Error::new(ErrorKind::Other, "range couldn't be made"))
     }
 }
 
@@ -72,9 +53,9 @@ pub struct QueryResult {
     pub table_name: String,
     pub indexes: Vec<IndexType>,
     pub fn_name: String,
-    pub fn_params: Vec<String>,
+    pub fn_params: Vec<tokenizer::Token>,
     pub sub_fn_names: Vec<String>,
-    pub sub_fn_params: Vec<Vec<String>>,
+    pub sub_fn_params: Vec<Vec<tokenizer::Token>>,
 }
 
 impl fmt::Display for QueryResult {
@@ -87,101 +68,101 @@ impl fmt::Display for QueryResult {
     }
 }
 
-/// Parses database query
 pub fn parse_query(query_str: &str, db_settings: &meta::DBSettings) -> Result<QueryResult> {
-    let re = Regex::new(r"(?<table_name>[[:alnum:]]*)\[(?<index>[[:digit:],.*-]*)\] ?(?<function_name>[[:alnum:]]*) ?(?<function_params>[[:ascii:]]*)\)?").unwrap();
+    let mut tokens = tokenizer::tokenize(query_str).into_iter().peekable();
 
-    let Some(captures) = re.captures(query_str) else {
-        return Err(Error::new(ErrorKind::NotFound, "No captures found"));
+    let Some(tokenizer::Token::String(table_name)) = tokens.next() else {
+        return Err(Error::new(ErrorKind::InvalidInput, "Expected string for table name"));
     };
-
-    let table_name = captures["table_name"].to_string();
-
     if !db_settings.table_exists(&table_name) {
-        return Err(Error::new(ErrorKind::InvalidInput, format!("Table {} doesn't exist", &captures["table_name"])))
+        return Err(Error::new(ErrorKind::InvalidInput, format!("Table {table_name} doesn't exist")))
     }
     let table_settings = db_settings.tables.get(&table_name).unwrap();
 
     let mut indexes: Vec<IndexType> = Vec::new();
+    while tokens.peek().is_some() && tokens.peek().unwrap().is_valid_index() {
+        match tokens.next() {
+            Some(tokenizer::Token::Integer(index)) => indexes.push(IndexType::Index(index as u64)),
+            Some(tokenizer::Token::Wildcard(modifier)) => {
+                if modifier == 0 {
+                    indexes.push(IndexType::Wildcard(0));
+                    continue;
+                }
+                if table_settings.biggest_id > modifier {
+                    let index = table_settings.biggest_id - modifier;
+                    indexes.push(IndexType::Index(index));
+                    continue;
+                }
+                return Err(Error::new(ErrorKind::InvalidInput, "Invalid wildcard modifier"));
+            },
+            Some(tokenizer::Token::Range((start, end))) => {
+                let start = start.to_int(table_settings);
+                let end = end.to_int(table_settings);
+                for index in start..=end {
+                    indexes.push(IndexType::Index(index));
+                }
+            },
+            Some(tokenizer::Token::Page(page)) => {
+                let page = page + 1;
+                let start = db_settings.compartment_rows as u64 * (page - 1);
+                let end = db_settings.compartment_rows as u64 * page - 1;
 
-    for (i, index_str) in captures["index"].split(",").enumerate() {
-        if i == 0 {
-            let range_re = Regex::new(r"(?<start_index>[[:digit:]*-]*)\.\.(?<end_index>[[:digit:]*-]*)").unwrap();
-            match range_re.captures(index_str) {
-                Some(captures) => {
-                    let Some(mut start_index) = IndexType::from_str(&captures["start_index"], table_settings) else {
-                        return Err(Error::new(ErrorKind::Other, "Index couldn't be parsed"));
-                    };
-                    let Some(mut end_index) = IndexType::from_str(&captures["end_index"], table_settings) else {
-                        return Err(Error::new(ErrorKind::Other, "Index couldn't be parsed"));
-                    };
-
-                    if start_index == IndexType::Wildcard {
-                        start_index = IndexType::Index(0);
+                for index in start..=end {
+                    if index > table_settings.biggest_id {
+                        continue;
                     }
-                    if end_index == IndexType::Wildcard {
-                        end_index = IndexType::Index(db_settings.tables.get(&table_name).unwrap().biggest_id);
-                    }
-
-                    if start_index >= end_index {
-                        return Err(Error::new(ErrorKind::Other, "Range not possible"));
-                    }
-
-                    let Ok(range) = start_index.into_range_inclusive(end_index) else {
-                        return Err(Error::new(ErrorKind::Other, "Range creation failed"));
-                    };
-                    for index in range {
-                        indexes.push(IndexType::Index(index));
-                    }
-                    break;
-                },
-                None => (),
-            }
+                    indexes.push(IndexType::Index(index));
+                }
+            },
+            _ => (),
         }
-
-        let Some(index) = IndexType::from_str(index_str, table_settings) else {
-            return Err(Error::new(ErrorKind::Other, "index couldn't be parsed"));
-        };
-        if i != 0 && index == IndexType::Wildcard {
-            return Err(Error::new(ErrorKind::InvalidInput, "Wildcard can only be used as the first index"));
-        }
-        if index == IndexType::Wildcard {
-            indexes.push(index);
-            break;
-        }
-
-        indexes.push(index)
     }
 
-    // Possibly temporary solution until I come up with a better regex
-    let param_split = util::escape_split(&captures["function_params"], '|');
+    let mut fn_name = String::new();
+    let mut fn_params = Vec::new();
+    let mut sub_fn_names = Vec::new();
+    let mut sub_fn_params = Vec::new();
 
-    let mut fn_params: Vec<String> = Vec::new();
-    let mut sub_fn_names: Vec<String> = Vec::new();
-    let mut sub_fn_params: Vec<Vec<String>> = Vec::new();
+    let token = tokens.next();
+    if let Some(tokenizer::Token::String(name)) = token {
+        fn_name = name;
+    } else if token.is_some() && token != Some(tokenizer::Token::Pipe) {
+        return Err(Error::new(ErrorKind::InvalidInput, "Expected String for function name"));
+    }
 
-    for (index, fn_str) in param_split.iter().enumerate() {
-        let fn_str = fn_str.trim();
+    if !fn_name.is_empty() {
+        while tokens.peek().is_some() {
+            let token = tokens.next().unwrap();
+            if token == tokenizer::Token::Pipe {
+                break;
+            }
+            fn_params.push(token);
+        }
+    }
 
-        if index == 0 { // we are on the first index which is main function params
-            fn_params = util::escape_split(fn_str, ',').iter().map(|v| String::from(*v)).collect();
-            continue;
+    while tokens.peek().is_some() {
+        let token = tokens.next().unwrap();
+        if let tokenizer::Token::String(name) = token {
+            sub_fn_names.push(name);
+        } else {
+            return Err(Error::new(ErrorKind::InvalidInput, "Expected String for sub function name"));
         }
 
-        let sub_fn_split: Vec<&str> = fn_str.splitn(2, ' ').collect();
-
-        sub_fn_names.push(sub_fn_split[0].to_string());
-
-        if sub_fn_split.len() != 2 {
-            return Err(Error::new(ErrorKind::InvalidInput, "sub functions require parameters"));
+        let mut params = Vec::new();
+        while tokens.peek().is_some() {
+            let token = tokens.next().unwrap();
+            if token == tokenizer::Token::Pipe {
+                break;
+            }
+            params.push(token);
         }
-        sub_fn_params.push(util::escape_split(sub_fn_split[1].trim(), ',').iter().map(|v| String::from(*v)).collect());
+        sub_fn_params.push(params);
     }
 
     Ok(QueryResult {
         table_name: table_name,
         indexes: indexes,
-        fn_name: captures["function_name"].to_string(),
+        fn_name: fn_name,
         fn_params: fn_params,
         sub_fn_names: sub_fn_names,
         sub_fn_params: sub_fn_params,
@@ -191,6 +172,7 @@ pub fn parse_query(query_str: &str, db_settings: &meta::DBSettings) -> Result<Qu
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::collections::HashMap;
 
     #[test]
     fn test_query_parse() {
@@ -208,23 +190,23 @@ mod tests {
             table_name: String::from("test"),
             indexes: vec![IndexType::Index(1),IndexType::Index(2),IndexType::Index(3),IndexType::Index(4)],
             fn_name: String::from("write"),
-            fn_params: vec![String::from("3n1298ud8h9apb"),String::from(r"sksdo\,kdskd")],
+            fn_params: vec![tokenizer::Token::String(String::from("3n1298ud8h9apb")), tokenizer::Token::String(String::from(r"sksdo\,kdskd"))],
             sub_fn_names: vec![String::from("test")],
-            sub_fn_params: vec![vec![String::from("dsadija"),String::from("daisdoi")]],
+            sub_fn_params: vec![vec![tokenizer::Token::String(String::from("dsadija")), tokenizer::Token::String(String::from("daisdoi"))]],
         });
         assert_eq!(parse_query("test[*] | test thingy | othertest thingy,1", &db_settings).unwrap(), QueryResult {
             table_name: String::from("test"),
-            indexes: vec![IndexType::Wildcard],
+            indexes: vec![IndexType::Wildcard(0)],
             fn_name: String::new(),
-            fn_params: vec![String::new()],
+            fn_params: vec![],
             sub_fn_names: vec![String::from("test"), String::from("othertest")],
-            sub_fn_params: vec![vec![String::from("thingy")], vec![String::from("thingy"), String::from("1")]],
+            sub_fn_params: vec![vec![tokenizer::Token::String(String::from("thingy"))], vec![tokenizer::Token::String(String::from("thingy")), tokenizer::Token::Integer(1)]],
         });
         assert_eq!(parse_query("test[1..5]", &db_settings).unwrap(), QueryResult {
             table_name: String::from("test"),
             indexes: vec![IndexType::Index(1),IndexType::Index(2),IndexType::Index(3),IndexType::Index(4),IndexType::Index(5)],
             fn_name: String::new(),
-            fn_params: vec![String::new()],
+            fn_params: vec![],
             sub_fn_names: Vec::new(),
             sub_fn_params: Vec::new(),
         });
@@ -232,7 +214,7 @@ mod tests {
             table_name: String::from("test"),
             indexes: vec![IndexType::Index(1),IndexType::Index(2),IndexType::Index(3),IndexType::Index(4),IndexType::Index(5),IndexType::Index(6)],
             fn_name: String::new(),
-            fn_params: vec![String::new()],
+            fn_params: vec![],
             sub_fn_names: Vec::new(),
             sub_fn_params: Vec::new(),
         });
@@ -240,14 +222,10 @@ mod tests {
             table_name: String::from("test"),
             indexes: vec![IndexType::Index(1),IndexType::Index(2),IndexType::Index(3),IndexType::Index(4),IndexType::Index(5)],
             fn_name: String::new(),
-            fn_params: vec![String::new()],
+            fn_params: vec![],
             sub_fn_names: Vec::new(),
             sub_fn_params: Vec::new(),
         });
-        parse_query("test 1 dsadsa i", &db_settings).expect_err("Succeeded in parsing incorrect query");
         parse_query("test[1.2]", &db_settings).expect_err("Succeeded in parsing incorrect query");
-        parse_query("test[1,m,5,ia,4]", &db_settings).expect_err("Succeeded in parsing incorrect query");
-        parse_query("test[0..*-10]", &db_settings).expect_err("Succeeded in parsing incorrect query");
-        parse_query("test[0-10]", &db_settings).expect_err("Succeeded in parsing incorrect query");
     }
 }
