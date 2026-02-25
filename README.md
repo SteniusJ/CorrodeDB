@@ -100,12 +100,20 @@ write and remove
 The syntax for reading data is:<br>
 `{table name}[{indexes}]`
 
+indexes can be subtracted from. For example:<br>
+`messages[10-5]`<br>
+will return row at index 5<br>
+if used in tandem with the Wildcard this will get the biggest index minus given value<br>
+`messages[*-10]`<br>
+will give biggest index - 10. So if a table has 20 values this will result in the value
+at index 10.
+
 **Single index**<br>
 `messages[20]`<br>
 this query will get the data at the index **20** in the table called **messages**
 
 **Multi index**<br>
-`messages[1,5,10,20,68]`<br>
+`messages[1,5,10,20,*-5]`<br>
 this query will get the data at the indexes **1,5,10,20,68** in the table
 called **messages**
 
@@ -115,9 +123,6 @@ this query will get the data at the indexes **60,61,62... 98,99,100** in the
 table called **messages**<br>
 `messages[50..*]`<br>
 this query wil get the data at the indexes **50,51,52... maximum table index**
-in the table called **messages**<br>
-`messages[*-20..*]`<br>
-this query will get the data at the indexes **maximum table index - 20... maximum table index**
 in the table called **messages**
 
 **Wildcard**<br>
@@ -247,3 +252,4 @@ Or a "\*" for Wildcard which will shuffle the whole vector<br>
 `messages[0..3] | random 5`<br>
 this query is not valid because you are attempting to retrieve 5 values
 out of a vector which is of size 4.
+

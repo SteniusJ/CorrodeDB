@@ -14,6 +14,10 @@ pub fn read_from_db(db_settings: &mut meta::DBSettings, file_system: &mut file::
             query::IndexType::Index(i) => {
                 let (line, file_name, index) = util::get_line_fname_idx(db_settings, query, *i);
 
+                if index > db_settings.tables.get(&query.table_name).unwrap().biggest_id {
+                    return Err(Error::new(ErrorKind::Other, "Index out of table range"));
+                }
+
                 match util::read_line(&file_name, file_system, line) {
                     Ok(content) => {
                         result.push(util::parse_db_line(content, index, &col_settings));
