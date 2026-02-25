@@ -3,6 +3,7 @@ use std::io::{Result, Error, ErrorKind};
 use crate::{file, query, meta, db_engine};
 use std::collections::HashMap;
 use std::cmp::Ordering;
+use std::collections::HashSet;
 
 /// Splits str by char ignoring those that have been escaped
 pub fn escape_split(input: &str, split_char: char) -> Vec<&str> {
@@ -28,6 +29,61 @@ pub fn escape_split(input: &str, split_char: char) -> Vec<&str> {
     }
 
     splits.push(input.get(last_split_i..input.len()).unwrap());
+    splits
+}
+
+/// Splits str by set of chars, ignoring those that have been escaped
+pub fn escape_split_by_many(input: &str, split_set: HashSet<char>) -> Vec<&str> {
+    let mut skip = false;
+    let mut building_string = false;
+    let mut building_string_proc = false;
+    let mut last_split_i = 0;
+    let mut splits: Vec<&str> = Vec::new();
+
+    for (index, char) in input.chars().enumerate() {
+        if skip {
+            skip = false;
+            continue;
+        }
+        
+        if char == '\\' {
+            skip = true;
+            continue;
+        }
+
+        if char == '"' {
+            if building_string {
+                building_string = false;
+            } else {
+                building_string = true;
+                building_string_proc = true;
+            }
+            continue;
+        }
+
+        if split_set.get(&char).is_some() && !building_string {
+            let split: &str;
+            if building_string_proc {
+                split = input.get(last_split_i+1..index-1).unwrap();
+            } else {
+                split = input.get(last_split_i..index).unwrap();
+            }
+            if !split.is_empty() {
+                splits.push(split);
+            }
+            last_split_i = index + 1;
+            building_string_proc = false;
+        }
+    }
+    let split: &str;
+    if building_string_proc {
+        split = input.get(last_split_i+1..input.len()-1).unwrap();
+    } else {
+        split = input.get(last_split_i..input.len()).unwrap();
+    }
+    if !split.is_empty() {
+        splits.push(split);
+    }
     splits
 }
 
@@ -169,7 +225,7 @@ pub fn db_result_prettify(result: Vec<HashMap<String, db_engine::DBDatatype>>) -
     pretty_string
 }
 
-pub fn merge_sort(data: &mut Vec<HashMap<String, db_engine::DBDatatype>>, sort_order: &str, sort_column: &str, left: usize, right: usize) -> Result<()> {
+pub fn merge_sort(data: &mut Vec<HashMap<String, db_engine::DBDatatype>>, sort_order: &query::tokenizer::Token, sort_column: &str, left: usize, right: usize) -> Result<()> {
     if data.len() <= 1 {
         return Ok(())
     }
@@ -177,10 +233,10 @@ pub fn merge_sort(data: &mut Vec<HashMap<String, db_engine::DBDatatype>>, sort_o
     if left < right {
         let mid = left + (right - left) / 2;
 
-        merge_sort(data, sort_order, sort_column, left, mid).unwrap();
-        merge_sort(data, sort_order, sort_column, mid + 1, right).unwrap();
+        merge_sort(data, &sort_order, sort_column, left, mid).unwrap();
+        merge_sort(data, &sort_order, sort_column, mid + 1, right).unwrap();
 
-        match merge(data, sort_order, sort_column, left, mid, right) {
+        match merge(data, &sort_order, sort_column, left, mid, right) {
             Ok(_) => (),
             Err(e) => return Err(e),
         }
@@ -189,12 +245,12 @@ pub fn merge_sort(data: &mut Vec<HashMap<String, db_engine::DBDatatype>>, sort_o
     Ok(())
 }
 
-fn merge(data: &mut Vec<HashMap<String, db_engine::DBDatatype>>, sort_order: &str, sort_column: &str, mut start: usize, mut mid: usize, end: usize) -> Result<()>{
+fn merge(data: &mut Vec<HashMap<String, db_engine::DBDatatype>>, sort_order: &query::tokenizer::Token, sort_column: &str, mut start: usize, mut mid: usize, end: usize) -> Result<()>{
     let mut start2 = mid + 1;
     let expected_order = match sort_order {
-        "asc" => Ordering::Less,
-        "dsc" => Ordering::Greater,
-        ord => return Err(Error::new(ErrorKind::InvalidInput, format!("{ord} is not a valid sorting order"))),
+        query::tokenizer::Token::SortAscending => Ordering::Less,
+        query::tokenizer::Token::SortDescending => Ordering::Greater,
+        ord => return Err(Error::new(ErrorKind::InvalidInput, format!("{ord:?} is not a valid sorting order"))),
     };
 
     let Some(order) = data[mid].get(sort_column).unwrap().partial_cmp(data[start2].get(sort_column).unwrap()) else {
