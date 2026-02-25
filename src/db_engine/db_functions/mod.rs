@@ -24,7 +24,7 @@ pub fn read_from_db(db_settings: &mut meta::DBSettings, file_system: &mut file::
                     }
                 };
             },
-            query::IndexType::Wildcard => {
+            query::IndexType::Wildcard(_) => {
                 let dir_name = format!("./tables/{}", query.table_name);
                 let Ok(dir) = file_system.read_folder(&dir_name) else {
                     panic!("Critical failiure! Table '{}' does not have a folder", query.table_name);
@@ -131,7 +131,7 @@ pub fn write_to_db(db_settings: &mut meta::DBSettings, file_system: &mut file::F
                 }
                 affected_indexes.push(index as i64);
             },
-            query::IndexType::Wildcard => {
+            query::IndexType::Wildcard(_) => {
                 let table_max_index = if db_settings.tables.get(&query.table_name).unwrap().biggest_id > 0 {
                     db_settings.tables.get(&query.table_name).unwrap().biggest_id + 1
                 } else {
@@ -188,7 +188,7 @@ pub fn remove_from_db(db_settings: &mut meta::DBSettings, file_system: &mut file
                 }
                 affected_indexes.push(index as i64);
             },
-            query::IndexType::Wildcard => {
+            query::IndexType::Wildcard(_) => {
                 let dir_name = format!("./tables/{}", query.table_name);
                 let Ok(dir) = file_system.read_folder(&dir_name) else {
                     return Err(Error::new(ErrorKind::Other, "Failed to open directory"));

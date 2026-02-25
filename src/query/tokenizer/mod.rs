@@ -150,10 +150,18 @@ fn index_from_str(from: &str) -> Option<query::IndexType> {
         return Some(query::IndexType::Wildcard(0));
     }
     if let Some(token) = try_subtraction(from) {
-        return Some(query::IndexType(token));
+        match  token {
+            Token::Wildcard(modifier) => {
+                return Some(query::IndexType::Wildcard(modifier));
+            },
+            Token::Integer(val) => {
+                return Some(query::IndexType::Index(val as u64));
+            },
+            _ => return None,
+        }
     }
     if let Ok(index) = from.parse::<i64>() {
-        return Some(Token::Integer(index));
+        return Some(query::IndexType::Index(index as u64));
     }
     None
 }

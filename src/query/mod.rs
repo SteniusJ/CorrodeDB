@@ -2,14 +2,13 @@ use std::io::{Result, Error, ErrorKind};
 use std::option::Option;
 use std::fmt;
 use crate::meta;
-use std::ops::RangeInclusive;
 
 pub mod tokenizer;
 
 #[derive(Debug, PartialEq)]
 pub enum IndexType {
     Index(u64),
-    Wildcard,
+    Wildcard(u64),
 }
 
 impl PartialOrd for IndexType {
@@ -22,46 +21,30 @@ impl PartialOrd for IndexType {
                     None
                 }
             },
-            IndexType::Wildcard => {
-                None
+            IndexType::Wildcard(self_v) => {
+                if let IndexType::Wildcard(other_v) = other {
+                    Some(self_v.cmp(other_v))
+                } else {
+                    None
+                }
             },
         }
     }
 }
 
 impl IndexType {
-    fn from_str(from: &str, table_settings: &meta::TableSettings) -> Option<IndexType> {
-        if from == "*" {
-            return Some(IndexType::Wildcard);
-        }
-        if let Ok(v) = from.parse::<u64>() {
-            return Some(IndexType::Index(v));
-        }
-        let subtract_split: Vec<&str> = from.split("-").collect();
-        if subtract_split.len() == 2 {
-            if let (_, Ok(val_2)) = (subtract_split[0] == "*", subtract_split[1].parse::<u64>()) {
-                let val_1 = table_settings.biggest_id;
-                if val_1 > val_2 {
-                    return Some(IndexType::Index(val_1 - val_2));
+    fn to_int(&self, table_settings: &meta::TableSettings) -> u64 {
+        match self {
+            IndexType::Index(value) => *value,
+            IndexType::Wildcard(modifier) => {
+                let biggest_index = table_settings.biggest_id;
+                if biggest_index > *modifier {
+                    biggest_index - *modifier
+                } else {
+                    biggest_index
                 }
-            }
-            if let (Ok(val_1), Ok(val_2)) = (subtract_split[0].parse::<u64>(), subtract_split[1].parse::<u64>()) {
-                if val_1 > val_2 {
-                    return Some(IndexType::Index(val_1 - val_2));
-                }
-            }
-        } 
-        None
-    }
-    fn into_range_inclusive(self, to: IndexType) -> Result<RangeInclusive<u64>> {
-        if self == IndexType::Wildcard || to == IndexType::Wildcard {
-            return Err(Error::new(ErrorKind::InvalidInput, "range does not work on Wildcard"));
+            },
         }
-
-        if let (IndexType::Index(from_v), IndexType::Index(to_v)) = (self, to) {
-            return Ok(from_v..=to_v);
-        }
-        Err(Error::new(ErrorKind::Other, "range couldn't be made"))
     }
 }
 
@@ -102,7 +85,7 @@ pub fn parse_query(query_str: &str, db_settings: &meta::DBSettings) -> Result<Qu
             Some(tokenizer::Token::Integer(index)) => indexes.push(IndexType::Index(index as u64)),
             Some(tokenizer::Token::Wildcard(modifier)) => {
                 if modifier == 0 {
-                    indexes.push(IndexType::Wildcard);
+                    indexes.push(IndexType::Wildcard(0));
                     continue;
                 }
                 if table_settings.biggest_id > modifier {
@@ -113,6 +96,8 @@ pub fn parse_query(query_str: &str, db_settings: &meta::DBSettings) -> Result<Qu
                 return Err(Error::new(ErrorKind::InvalidInput, "Invalid wildcard modifier"));
             },
             Some(tokenizer::Token::Range((start, end))) => {
+                let start = start.to_int(table_settings);
+                let end = end.to_int(table_settings);
                 for index in start..=end {
                     indexes.push(IndexType::Index(index));
                 }
