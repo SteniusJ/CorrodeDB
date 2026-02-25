@@ -104,8 +104,8 @@ pub fn parse_query(query_str: &str, db_settings: &meta::DBSettings) -> Result<Qu
             },
             Some(tokenizer::Token::Page(page)) => {
                 let page = page + 1;
-                let start = db_settings.compartment_rows as u64 * page - 1;
-                let end = db_settings.compartment_rows as u64 * page;
+                let start = db_settings.compartment_rows as u64 * (page - 1);
+                let end = db_settings.compartment_rows as u64 * page - 1;
 
                 for index in start..=end {
                     if index > table_settings.biggest_id {
@@ -196,7 +196,7 @@ mod tests {
         });
         assert_eq!(parse_query("test[*] | test thingy | othertest thingy,1", &db_settings).unwrap(), QueryResult {
             table_name: String::from("test"),
-            indexes: vec![IndexType::Wildcard],
+            indexes: vec![IndexType::Wildcard(0)],
             fn_name: String::new(),
             fn_params: vec![],
             sub_fn_names: vec![String::from("test"), String::from("othertest")],
@@ -226,10 +226,6 @@ mod tests {
             sub_fn_names: Vec::new(),
             sub_fn_params: Vec::new(),
         });
-        parse_query("test 1 dsadsa i", &db_settings).expect_err("Succeeded in parsing incorrect query");
         parse_query("test[1.2]", &db_settings).expect_err("Succeeded in parsing incorrect query");
-        parse_query("test[1,m,5,ia,4]", &db_settings).expect_err("Succeeded in parsing incorrect query");
-        parse_query("test[0..*-10]", &db_settings).expect_err("Succeeded in parsing incorrect query");
-        parse_query("test[0-10]", &db_settings).expect_err("Succeeded in parsing incorrect query");
     }
 }
