@@ -82,13 +82,13 @@ pub fn where_from_db(data: &mut Vec<HashMap<String, DBDatatype>>, query: &query:
         operator
     };
     let comparison_value = {
-        let Some(query::tokenizer::Token::String(comparison_value)) = arguments.next() else {
+        let Some(comparison_token) = arguments.next() else {
             return Err(Error::new(ErrorKind::InvalidInput, "Please give comparison value"));
         };
         if column.is_empty() {
             return Err(Error::new(ErrorKind::InvalidInput, "Please give column name"));
         }
-        DBDatatype::from_str(&comparison_value)
+        DBDatatype::from_str(&comparison_token.to_string())
     };
 
     let mut index: usize = 0;

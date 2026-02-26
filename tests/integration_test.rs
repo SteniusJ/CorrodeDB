@@ -59,7 +59,7 @@ fn test_queries() {
      * setup
      */
     for _ in 0..6 {
-        single_query(TEST_SCHEMA_PATH, "write[*] write 1,1.2,hello wolrd");
+        single_query(TEST_SCHEMA_PATH, "write[*] write 1,1.2,\"hello wolrd\"");
     }
 
     let write_data = format!("0x{:X}", rng.random::<u128>());
@@ -74,7 +74,7 @@ fn test_queries() {
 
     // Test where
     assert_eq!(single_query(TEST_SCHEMA_PATH, "read[*] | where int,<,3").into_vec().unwrap()[2].get("int").unwrap().as_i64().unwrap(), 2);
-    assert_eq!(single_query(TEST_SCHEMA_PATH, "read[*] | where string,=,d this is row 3").into_vec().unwrap()[0].get("int").unwrap().as_i64().unwrap(), 3);
+    assert_eq!(single_query(TEST_SCHEMA_PATH, "read[*] | where string,=,\"d this is row 3\"").into_vec().unwrap()[0].get("int").unwrap().as_i64().unwrap(), 3);
     assert_eq!(single_query(TEST_SCHEMA_PATH, "read[*] | where string,in,j").into_vec().unwrap()[0].get("int").unwrap().as_i64().unwrap(), 6);
 
     // Test remove
