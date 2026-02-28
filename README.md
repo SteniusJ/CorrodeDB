@@ -95,6 +95,17 @@ By default the console queries is false
 CorrodeDB has a unique query structure and support for three functions read,
 write and remove
 
+Currently, post tokenizer update, the query structure is very flexible for better or worse.
+
+**For example:**<br>
+`messages[10 8]4,11 20`<br>
+The above is a completely valid query that will get the items at the indexes "10,8,4,11,20"
+in the table "messages". This is because the characters `[ ] , " "` all function as
+splitters. Due to this you can pick and choose to use spaces or commas or opening/closing
+brackets as separators if you wish. I however recommend to use the currently given query
+structure since this is as I intended for the queries to look, and a future update might
+require the queries to look as such.
+
 ### Data read
 
 The syntax for reading data is:<br>
@@ -140,14 +151,14 @@ values by using the "\\" escape character. For example "," and "|" are both used
 the query syntax and they can be escaped by typing "\\," or "\\|".
 
 **Writing to specific index**<br>
-`messages[10] write hello\, world,100,12.239`<br>
+`messages[10] write "hello, world",100,12.239`<br>
 this query will write the data **"hello, world" | 100 | 12.239** to the index **10**<br>
-`messages[5,10,15,20] write hello\, world,100,12.239`<br>
+`messages[5,10,15,20] write "hello, world",100,12.239`<br>
 this query will write the data **"hello, world" | 100 | 12.239** to the indexes **5,10,15,20**<br>
 also works with other types of indexing like range
 
 **Appending to database**<br>
-`messages[*] write hello\, world,100,12.239`<br>
+`messages[*] write "hello, world",100,12.239`<br>
 this query will write the data **"hello, world" | 100 | 12.239** to the last
 available index.
 
@@ -182,7 +193,7 @@ these do not return data, just a status.
 **this is a valid use of the sort sub function:**<br>
 `messages[10..100] | where message,in,hello | sort message,asc`<br>
 **this is not:**<br>
-`messages[*] write hello world | sort message,asc`<br>
+`messages[*] write "hello world" | sort message,asc`<br>
 
 sub functions can also be theoretically infinitely "stacked".
 
@@ -216,7 +227,7 @@ any name of a database column in the given table.<br>
 returns rows which match the given comparison value.
 
 **usage:**<br>
-`messages[*] | where message,in,hello world`<br>
+`messages[*] | where message,in,"hello world"`<br>
 
 #### Parameters
 
@@ -252,4 +263,3 @@ Or a "\*" for Wildcard which will shuffle the whole vector<br>
 `messages[0..3] | random 5`<br>
 this query is not valid because you are attempting to retrieve 5 values
 out of a vector which is of size 4.
-
