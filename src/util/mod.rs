@@ -88,9 +88,11 @@ pub fn escape_split_by_many(input: &str, split_set: HashSet<char>) -> Vec<&str> 
 }
 
 pub fn sanitize_db_entry(input: String) -> String {
-    let mut sanitized_string = String::new();
+    let mut sanitized_string = String::with_capacity(input.len()); // sanitized string can only be larger than the input so it is
+                                                                           // more performant to assume that the string will be at least of input length
     for char in input.chars() {
         match char {
+            ',' => sanitized_string.push_str(r"\,"),
             '\n' => sanitized_string.push_str(r"\n"),
             '"' => sanitized_string.push_str("\\\""),
             '\r' => sanitized_string.push_str(r"\r"),
@@ -161,7 +163,7 @@ pub fn file_write(file_name: &str, file_data: Vec<String>, file_system: &mut fil
         }
     }
 
-    match file_system.write_entire_cache_to_disk() {
+    match file_system.write_cache_to_disk(file_name) {
         Ok(_) => return true,
         Err(_) => return false, 
     }

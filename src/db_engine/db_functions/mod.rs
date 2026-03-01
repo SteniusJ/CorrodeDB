@@ -112,7 +112,7 @@ pub fn write_to_db(db_settings: &mut meta::DBSettings, file_system: &mut file::F
         }
     }
 
-    let write_data: Vec<String> = write_data.into_iter().map(move |token| token.to_string()).collect();
+    let write_data: Vec<String> = write_data.into_iter().map(move |token| util::sanitize_db_entry(token.to_string())).collect();
 
     for index in &query.indexes {
         match index {
@@ -124,7 +124,7 @@ pub fn write_to_db(db_settings: &mut meta::DBSettings, file_system: &mut file::F
                 };
 
                 if file_data.len() > line as usize {
-                    file_data[line as usize] = util::sanitize_db_entry(write_data.join(","));
+                    file_data[line as usize] = write_data.join(",");
                 } else {
                     return Err(Error::new(ErrorKind::Other, "Attempting to write outside index bounds"));
                 }
@@ -147,7 +147,7 @@ pub fn write_to_db(db_settings: &mut meta::DBSettings, file_system: &mut file::F
                     return Err(Error::new(ErrorKind::Other, "File read error"));
                 };
 
-                file_data.push(util::sanitize_db_entry(write_data.join(",")));
+                file_data.push(write_data.join(","));
 
                 if util::file_write(&file_name, file_data, file_system) {
                     db_settings.iterate_id(&query.table_name);
