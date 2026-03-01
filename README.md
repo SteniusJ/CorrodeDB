@@ -173,6 +173,14 @@ in the table called **messages**
 
 this query will get the data at **all indexes** in the table called **messages**
 
+### Page:
+
+`messages[p0]`
+
+this query will get the data from 0 to max or end of container. For example if
+you have defined 50 rows in database settings it will get 0-49 and `p1` would
+get 50-99 etc. If container ends it will get up to that point.
+
 ## Data write
 
 the syntax for writing data is:
@@ -332,3 +340,4 @@ Or a "\*" for Wildcard which will shuffle the whole vector
 
 this query is not valid because you are attempting to retrieve 5 values
 out of a vector which is of size 4.
+
