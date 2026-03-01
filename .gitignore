@@ -3,6 +3,7 @@
 test_data/test_write_file
 meta.yaml
 greg_schema.yaml
+test_schema.yaml
 schema.yaml
 debug
 **/*.rs.bk
