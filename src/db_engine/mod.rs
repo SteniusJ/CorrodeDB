@@ -165,7 +165,7 @@ impl DBResult {
 enum DBFunction {
     Main(fn(&mut meta::DBSettings, &mut file::FileSystem, &query::QueryResult) -> Result<Vec<HashMap<String, DBDatatype>>>),
     MainReturnStatus(fn(&mut meta::DBSettings, &mut file::FileSystem, &query::QueryResult) -> Result<(String, Vec<i64>)>),
-    Sub(fn(&mut Vec<HashMap<String, DBDatatype>>, &query::QueryResult, &Vec<query::tokenizer::Token>, &meta::DBSettings) -> Result<()>),
+    Sub(fn(&mut Vec<HashMap<String, DBDatatype>>, &query::QueryResult, &Vec<String>, &meta::DBSettings) -> Result<()>),
 }
 
 pub struct DBEngine {

@@ -28,7 +28,7 @@ pub fn read_from_db(db_settings: &mut meta::DBSettings, file_system: &mut file::
                     }
                 };
             },
-            query::IndexType::Wildcard(_) => {
+            query::IndexType::Wildcard => {
                 let dir_name = format!("./tables/{}", query.table_name);
                 let Ok(dir) = file_system.read_folder(&dir_name) else {
                     panic!("Critical failiure! Table '{}' does not have a folder", query.table_name);
@@ -95,26 +95,24 @@ pub fn write_to_db(db_settings: &mut meta::DBSettings, file_system: &mut file::F
 
         match col_data.value {
             meta::ColValue::NumberI => {
-                if !row_data.1.is_int() {
+                if row_data.1.parse::<i64>().is_err() {
                     return Err(Error::new(ErrorKind::InvalidInput, "Data type does not match column type which is NumberI"));
                 }
             },
             meta::ColValue::NumberF => {
-                if !row_data.1.is_float() {
+                if row_data.1.parse::<f64>().is_err() {
                     return Err(Error::new(ErrorKind::InvalidInput, "Data type does not match column type which is NumberF"));
                 }
             },
-            meta::ColValue::VarChar => {
-                if !row_data.1.is_string() {
-                    return Err(Error::new(ErrorKind::InvalidInput, "Data type does not match column type which is VarChar"));
-                }
-            }
+            _ => (),
         }
     }
 
     let write_data: Vec<String> = write_data.into_iter().map(move |token| util::sanitize_db_entry(token.to_string())).collect();
 
     for index in &query.indexes {
+        // Since data can only be written to one index at a time
+        // we only need to look at the first index.
         match index {
             query::IndexType::Index(i) => {
                 let (line, file_name, index) = util::get_line_fname_idx(db_settings, query, *i);
@@ -135,7 +133,7 @@ pub fn write_to_db(db_settings: &mut meta::DBSettings, file_system: &mut file::F
                 }
                 affected_indexes.push(index as i64);
             },
-            query::IndexType::Wildcard(_) => {
+            query::IndexType::Wildcard => {
                 let table_max_index = if db_settings.tables.get(&query.table_name).unwrap().biggest_id > 0 {
                     db_settings.tables.get(&query.table_name).unwrap().biggest_id + 1
                 } else {
@@ -192,7 +190,7 @@ pub fn remove_from_db(db_settings: &mut meta::DBSettings, file_system: &mut file
                 }
                 affected_indexes.push(index as i64);
             },
-            query::IndexType::Wildcard(_) => {
+            query::IndexType::Wildcard => {
                 let dir_name = format!("./tables/{}", query.table_name);
                 let Ok(dir) = file_system.read_folder(&dir_name) else {
                     return Err(Error::new(ErrorKind::Other, "Failed to open directory"));
