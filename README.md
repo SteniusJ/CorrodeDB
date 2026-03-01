@@ -5,14 +5,14 @@ getting data from index positions. It has support for four functions that add
 vital functionality and improve usability, more info about these functions can
 be found below in the **Queries** section.
 
-## Compatability
+# Compatability
 
 CorrodeDB has been made and tested on mostly Linux machines and I cannot
 guarantee that it will function on non unix systems. A small amount of testing
 on Windows has led successfull results but I cannot guarantee any functionality
 at this point.
 
-## Application Init
+# Application Init
 
 Before starting up CorrodeDB you need to define a database schema along with
 some general database settings.
@@ -20,7 +20,7 @@ some general database settings.
 A commented **example** for how such a **schema** should look like can be found
 in the **"schema_exmaple.yaml"** file.
 
-### Database schema
+# Database schema
 
 The schema does have some restrictions which should be followed:
 
@@ -30,7 +30,7 @@ The schema does have some restrictions which should be followed:
 - There are currently three **datatypes**: **NumberI** (Integer values),
   **NumberF** (Floating point values), **VarChar** (String values)
 
-### General Settings
+# General Settings
 
 Currently there are two settings:
 
@@ -40,34 +40,44 @@ Currently there are two settings:
 - **password** the database password required for data access. This password is
   given to the database as a url parameter called "password"
 
-### Application parameters
+## Application parameters
 
 CorrodeDB has support for application parameters which can be set by the
 following flags. Order of definition doesn't matter.
 
-#### -s
+### -s
 
 flag for setting schema path
 
-**usage:**<br>
--s {schema path} <-- schema path may not include the hyphen character "-" or a space<br>
-**example:**<br>
-`-s ../another_folder/my_schema.yaml`<br>
-**default**<br>
+#### usage:
+
+-s {schema path} <-- schema path may not include the hyphen character "-" or a space
+
+#### example:
+
+`-s ../another_folder/my_schema.yaml`
+
+#### default:
+
 CorrodeDB will default to **./schema.yaml** if no path is given
 
-#### -p
+### -p
 
 flag for setting port
 
-**usage:**<br>
--p {port}<br>
-**example:**<br>
-`-p 8008`<br>
-**default**<br>
+#### usage:
+
+-p {port}
+
+#### example:
+
+`-p 8008`
+
+#### default:
+
 CorrodeDB will default to port **4067** if no port is given
 
-#### -di
+### -di
 
 flag for running the program in data integrity check mode.
 In this mode the program goes through all database data and makes sure it is in
@@ -75,30 +85,38 @@ the correct syntax. Writes out all noticed faults in the console during executio
 
 recommended to use if you have been touching around in the database files manually.
 
-**usage:**<br>
-`-di true` has to be used with the value as `true`<br>
-**default**<br>
+#### usage:
+
+`-di true` has to be used with the value as `true`
+
+#### default:
+
 By default the data integrity check is false
 
-#### -cq
+### -cq
 
 flag for running the program in console queries debug mode.
 This mode allows the user to make db queries from the console interface.
 
-**usage:**<br>
-`-cq true` hast to be used with the values as `true`<br>
-**default**<br>
+#### usage:
+
+`-cq true` hast to be used with the values as `true`
+
+#### default:
+
 By default the console queries is false
 
-## Queries
+# Queries
 
 CorrodeDB has a unique query structure and support for three functions read,
 write and remove
 
 Currently, post tokenizer update, the query structure is very flexible for better or worse.
 
-**For example:**<br>
-`messages[10 8]4,11 20`<br>
+### For example:
+
+`messages[10 8]4,11 20`
+
 The above is a completely valid query that will get the items at the indexes "10,8,4,11,20"
 in the table "messages". This is because the characters `[ ] , " "` all function as
 splitters. Due to this you can pick and choose to use spaces or commas or opening/closing
@@ -106,43 +124,59 @@ brackets as separators if you wish. I however recommend to use the currently giv
 structure since this is as I intended for the queries to look, and a future update might
 require the queries to look as such.
 
-### Data read
+## Data read
 
-The syntax for reading data is:<br>
+The syntax for reading data is:
+
 `{table name}[{indexes}]`
 
-indexes can be subtracted from. For example:<br>
-`messages[10-5]`<br>
-will return row at index 5<br>
-if used in tandem with the Wildcard this will get the biggest index minus given value<br>
-`messages[*-10]`<br>
-will give biggest index - 10. So if a table has 20 values this will result in the value
+indexes can be subtracted from. For example:
+
+`messages[10-5]`
+
+will return row at index 5
+
+if used in tandem with the Wildcard this will get the biggest index minus given value
+
+`messages[*-10]`
+will give biggest index -10. So if a table has 20 values this will result in the value
 at index 10.
 
-**Single index**<br>
-`messages[20]`<br>
+### Single index:
+
+`messages[20]`
+
 this query will get the data at the index **20** in the table called **messages**
 
-**Multi index**<br>
-`messages[1,5,10,20,*-5]`<br>
+### Multi index:
+
+`messages[1,5,10,20,*-5]`
+
 this query will get the data at the indexes **1,5,10,20,68** in the table
 called **messages**
 
-**Index range**<br>
-`messages[60..100]`<br>
+### Index range:
+
+`messages[60..100]`
+
 this query will get the data at the indexes **60,61,62... 98,99,100** in the
-table called **messages**<br>
-`messages[50..*]`<br>
+table called **messages**
+
+`messages[50..*]`
+
 this query wil get the data at the indexes **50,51,52... maximum table index**
 in the table called **messages**
 
-**Wildcard**<br>
-`messages[*]`<br>
+### Wildcard:
+
+`messages[*]`
+
 this query will get the data at **all indexes** in the table called **messages**
 
-### Data write
+## Data write
 
-the syntax for writing data is:<br>
+the syntax for writing data is:
+
 `{table name}[{index}] write {new data}`
 
 The new data is given in a comma seperated string.
@@ -150,39 +184,53 @@ Characters used in the query syntax can be escaped in VarChar
 values by using the "\\" escape character. For example "," and "|" are both used in
 the query syntax and they can be escaped by typing "\\," or "\\|".
 
-**Writing to specific index**<br>
-`messages[10] write "hello, world",100,12.239`<br>
-this query will write the data **"hello, world" | 100 | 12.239** to the index **10**<br>
-`messages[5,10,15,20] write "hello, world",100,12.239`<br>
-this query will write the data **"hello, world" | 100 | 12.239** to the indexes **5,10,15,20**<br>
+### Writing to specific index:
+
+`messages[10] write "hello, world",100,12.239`
+
+this query will write the data **"hello, world" | 100 | 12.239** to the index **10**
+
+`messages[5,10,15,20] write "hello, world",100,12.239`
+
+this query will write the data **"hello, world" | 100 | 12.239** to the indexes **5,10,15,20**
+
 also works with other types of indexing like range
 
-**Appending to database**<br>
-`messages[*] write "hello, world",100,12.239`<br>
+### Appending to database:
+
+`messages[*] write "hello, world",100,12.239`
+
 this query will write the data **"hello, world" | 100 | 12.239** to the last
 available index.
 
-### Data remove
+## Data remove
 
-the syntax for removing data is:<br>
+the syntax for removing data is:
+
 `{table name}[{index}] remove`
 
 Data remove also works with the other types of indexing.
 Using data remove with the Wildcard "\*" drops tables.
 
-**Example**<br>
-`messages[10] remove`<br>
+### Example:
+
+`messages[10] remove`
+
 this query will remove the data at index **10**
 
-## Sub functions
+# Sub functions
 
 Sub functions are data transformation functions which can be used to transform
 the returned db data.
 
-**Syntax:**<br>
-sub functions are used by "piping" the data into them.<br>
-**example:**<br>
-`messages[*] | sort message,asc`<br>
+## Syntax:
+
+sub functions are used by "piping" the data into them.
+
+### example:
+
+`messages[*] | sort message,asc`
+
 this query "pipes" the return data of `messages[*]` into the sub function "sort"
 which sorts the return in ascending order by the column "messages".
 
@@ -190,76 +238,97 @@ sub functions can be used on any db functions which return data. For example
 sub functions can not be used on the function "remove" or "write" since
 these do not return data, just a status.
 
-**this is a valid use of the sort sub function:**<br>
-`messages[10..100] | where message,in,hello | sort message,asc`<br>
-**this is not:**<br>
-`messages[*] write "hello world" | sort message,asc`<br>
+#### this is a valid use of the sort sub function:
+
+`messages[10..100] | where message,in,hello | sort message,asc`
+
+#### this is not:
+
+`messages[*] write "hello world" | sort message,asc`
 
 sub functions can also be theoretically infinitely "stacked".
 
-**For example:**<br>
+#### For example:
+
 this is a completely valid, though stupid, query which you can do by stacking
-all of these sub functions.<br>
-`messages[*] | sort message,asc | where message,in,a | random 5 | sort message,dsc | random 2`<br>
+all of these sub functions.
+
+`messages[*] | sort message,asc | where message,in,a | random 5 | sort message,dsc | random 2`
+
 this query will return 2 random messages which have a value in the column "message"
 that includes the letter "a".
 
-### sort
+## sort
 
 sorts data in ascending or descending order by given column.
 Uses merge sort algorithm.
 
-**usage:**<br>
-`messages[*] | sort message,asc`<br>
+### usage:
 
-#### Parameters
+`messages[*] | sort message,asc`
 
-`messages[*] | sort {column name},{sort mode}`<br>
-**Column name:**<br>
-any name of a database column in the given table.<br>
-**Sort mode:**<br>
+### Parameters:
+
+`messages[*] | sort {column name},{sort mode}`
+
+#### Column name:
+
+any name of a database column in the given table.
+
+#### Sort mode:
 
 - `asc` for ascending
 - `dsc` for descending
 
-### where
+## where
 
 returns rows which match the given comparison value.
 
-**usage:**<br>
-`messages[*] | where message,in,"hello world"`<br>
+### usage:
 
-#### Parameters
+`messages[*] | where message,in,"hello world"`
 
-`messages[*] | where {column_name},{operator},{comparison_value}`<br>
-**Column name:**<br>
-any name of a database column in the given table.<br>
-**Operator:**<br>
+### Parameters
+
+`messages[*] | where {column_name},{operator},{comparison_value}`
+
+#### Column name:
+
+any name of a database column in the given table.
+
+#### Operator:
 
 - `=` for values that equal comparison_value, case sensitive for VarChar
 - `>` for values that are more than comparison_value (not usable on VarChar values!)
 - `<` for values that are less than comparison_value (not usable on VarChar values!)
 - `in` for values that includes the comparison_value (only usable on VarChar values!)
 
-**Comparison value:**<br>
+#### Comparison value:
+
 value used for comparison with row value. Should have the same datatype as the
 column which is being compared with.
 
-### random
+## random
 
 returns n number of random values
 
-**usage:**<br>
-`messages[*] | random 3`<br>
+### usage:
 
-#### Parameters
+`messages[*] | random 3`
 
-`messages[*] | random {nr_of_random_values}`<br>
-**Nr of random values:**<br>
+### Parameters
+
+`messages[*] | random {nr_of_random_values}`
+
+#### Nr of random values:
+
 a integer value defining the amount of random values to get.
 Should be less than the number of values given to the function.
-Or a "\*" for Wildcard which will shuffle the whole vector<br>
-**for example:**<br>
-`messages[0..3] | random 5`<br>
+Or a "\*" for Wildcard which will shuffle the whole vector
+
+#### for example:
+
+`messages[0..3] | random 5`
+
 this query is not valid because you are attempting to retrieve 5 values
 out of a vector which is of size 4.
