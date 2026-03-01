@@ -94,7 +94,6 @@ pub fn sanitize_db_entry(input: String) -> String {
         match char {
             ',' => sanitized_string.push_str(r"\,"),
             '\n' => sanitized_string.push_str(r"\n"),
-            '"' => sanitized_string.push_str("\\\""),
             '\r' => sanitized_string.push_str(r"\r"),
             char => sanitized_string.push(char),
         }
