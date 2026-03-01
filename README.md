@@ -188,9 +188,10 @@ the syntax for writing data is:
 `{table name}[{index}] write {new data}`
 
 The new data is given in a comma seperated string.
-Characters used in the query syntax can be escaped in VarChar
-values by using the "\\" escape character. For example "," and "|" are both used in
-the query syntax and they can be escaped by typing "\\," or "\\|".
+VarChar values should be encapsulated in double quotes.
+This is not necessary if a string doesn't include any of the spacer
+characters. Double quotes inside VarChar values can be escaped with
+a forward slash "\".
 
 ### Writing to specific index:
 
