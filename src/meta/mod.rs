@@ -11,7 +11,6 @@ pub enum ColValue {
 #[derive(Debug)]
 pub struct DBSettings {
     pub tables: HashMap<String, TableSettings>,
-    pub password: String,
     pub compartment_rows: i16,
 }
 
@@ -35,58 +34,36 @@ impl DBSettings {
 
         let mut table_map: HashMap<String, TableSettings> = HashMap::new();
 
-        for tables in doc["tables"].as_hash().unwrap().iter().enumerate() {
-            let table_name = tables.1.0.as_str().unwrap();
-            let mut col_vec: Vec<ColSettings> = Vec::new();
+        for tables in doc["tables"].as_hash().expect("Expected object 'tables'").iter() {
 
-            // Tables have the possibility to hold other data than just what rows they include, but
-            // this is currently not used so we skip one and iterate the rows.
-            // 
-            // Not sure this is most optimal.
-            for columns in tables.1.1.as_hash()
-            .unwrap()
-            .iter()
-            .next()
-            .unwrap()
-            .1
-            .as_hash()
-            .unwrap()
-            .iter()
-            .enumerate() {
-                let mut col_settings = ColSettings {
-                    name: columns.1.0.as_str().unwrap().to_string(),
-                    value: ColValue::VarChar,
+            let table_name = tables.0.clone().into_string().expect("Expected table name");
+            let mut columns: Vec<ColSettings> = Vec::new();
+
+            for column in tables.1["columns"].as_hash().expect(&format!("expected table {table_name} to have columns, please create a object called 'columns'")).iter() {
+                let col_settings = ColSettings {
+                    name: column.0.clone().into_string().expect("Expected column name"),
+                    value: match column.1["value"].as_str().expect("Expected variable 'value'") {
+                        "NumberI" => ColValue::NumberI,
+                        "NumberF" => ColValue::NumberF,
+                        "VarChar" => ColValue::VarChar,
+                        v => panic!("Expected column value to be 'NumberI', 'NumberF' or 'VarChar', not '{v}'"),
+                    },
                 };
 
-                for col_data in columns.1.1.as_hash().unwrap().iter().enumerate() {
-                    match col_data.1.0.as_str().unwrap() {
-                        "value" => {
-                            col_settings.value = match col_data.1.1.as_str().unwrap() {
-                                "NumberI" => ColValue::NumberI,
-                                "NumberF" => ColValue::NumberF,
-                                "VarChar" => ColValue::VarChar,
-                                _ => ColValue::VarChar,
-                            }
-                        }
-                        _ => (),
-                    }
-                }
-
-                col_vec.push(col_settings);
+                columns.push(col_settings);
             }
 
             let table_settings = TableSettings {
-                columns: col_vec.clone(),
+                columns: columns,
                 biggest_id: 0,
             };
 
-            table_map.insert(table_name.to_string(), table_settings);
+            table_map.insert(table_name, table_settings);
         }
 
         DBSettings {
             tables: table_map,
-            password: doc["settings"]["password"].as_str().unwrap().to_string(),
-            compartment_rows: doc["settings"]["compartment"]["rows"].as_i64().unwrap() as i16,
+            compartment_rows: doc["settings"]["compartment"]["rows"].as_i64().expect("Expected compartmet rows value") as i16,
         }
     }
     pub fn table_exists(&self, table_name: &String) -> bool {
@@ -94,6 +71,9 @@ impl DBSettings {
     }
     pub fn iterate_id(&mut self, table_name: &String) {
         self.tables.get_mut(table_name).unwrap().iterate_id();
+    }
+    pub fn reset_id(&mut self, table_name: &String) {
+        self.tables.get_mut(table_name).unwrap().biggest_id = 0;
     }
 }
 
@@ -106,7 +86,7 @@ impl TableSettings {
         }
         Err(Error::new(ErrorKind::Other, "column not found"))
     }
-    pub fn has_column(&self, column_name: String) -> bool {
+    pub fn has_column(&self, column_name: &str) -> bool {
         for column in &self.columns {
             if column.name == column_name {
                 return true;
@@ -191,4 +171,30 @@ pub fn load_meta(meta_file_path: &str) -> DBSettings {
 
     println!("--------- db setup finished ---------\n");
     db_settings
+}
+
+pub fn get_password(meta_file_path: &str) -> String {
+    let mut file_system = crate::file::FileSystem::new();
+
+    match file_system.open(meta_file_path) {
+        Ok(_) => (),
+        Err(e) => panic!("Schema file open failed: {e:?}"),
+    }
+
+    let test_config_yaml = match file_system.read_from_cache(meta_file_path) {
+        Ok(contents) => {
+            contents.join("\n")
+        },
+        Err(e) => panic!("Schema file read failed: {e:?}"),
+    };
+
+    match file_system.drop_from_cache(meta_file_path) {
+        Ok(_) => (),
+        Err(e) => println!("Schema file drop failed: {e:?}"),
+    }
+
+    let docs = YamlLoader::load_from_str(test_config_yaml.as_str()).unwrap();
+    let doc = &docs[0];
+
+    doc["settings"]["password"].as_str().unwrap().to_string()
 }

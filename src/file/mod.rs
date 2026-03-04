@@ -3,6 +3,7 @@ use std::fs::{
     DirBuilder,
     ReadDir,
 };
+use std::fs;
 use std::path::Path;
 use std::io::prelude::*;
 use std::collections::HashMap;
@@ -56,6 +57,11 @@ impl FileSystem {
         self.add_to_cache(file_name.to_string(), contents.lines().map(String::from).collect());
 
         Ok(Status::Success)
+    }
+    
+    // wrapper for fs::remove_file
+    pub fn remove(&mut self, file_name: &str) -> Result<()> {
+        fs::remove_file(file_name)
     }
     
     /// Writes data to cache if file is stored in cache

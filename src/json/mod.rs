@@ -46,6 +46,17 @@ impl fmt::Display for JSONValue {
     }
 }
 
+impl Into<JSONValue> for Vec<i64> {
+    fn into(self) -> JSONValue {
+        let mut json_vec: Vec<JSONValue> = Vec::with_capacity(self.len());
+
+        for val in self {
+            json_vec.push(JSONValue::NumI(val));
+        }
+        JSONValue::Array(json_vec)
+    }
+}
+
 // Simple JSON encoder that fits this projects needs
 pub fn encode(values: Vec<(&str, JSONValue)>) -> String {
     let mut json_string = String::from("{");
