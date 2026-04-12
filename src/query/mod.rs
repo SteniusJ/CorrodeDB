@@ -1,57 +1,13 @@
 use std::io::{Result, Error, ErrorKind};
-use std::option::Option;
 use std::fmt;
 use crate::meta;
 
 pub mod tokenizer;
 
 #[derive(Debug, PartialEq)]
-pub enum IndexType {
-    Index(u64),
-    Wildcard(u64),
-}
-
-impl PartialOrd for IndexType {
-    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        match self {
-            IndexType::Index(self_v) => {
-                if let IndexType::Index(other_v) = other {
-                    Some(self_v.cmp(other_v))
-                } else {
-                    None
-                }
-            },
-            IndexType::Wildcard(self_v) => {
-                if let IndexType::Wildcard(other_v) = other {
-                    Some(self_v.cmp(other_v))
-                } else {
-                    None
-                }
-            },
-        }
-    }
-}
-
-impl IndexType {
-    fn to_int(&self, table_settings: &meta::TableSettings) -> u64 {
-        match self {
-            IndexType::Index(value) => *value,
-            IndexType::Wildcard(modifier) => {
-                let biggest_index = table_settings.biggest_id;
-                if biggest_index > *modifier {
-                    biggest_index - *modifier
-                } else {
-                    biggest_index
-                }
-            },
-        }
-    }
-}
-
-#[derive(Debug, PartialEq)]
 pub struct QueryResult {
     pub table_name: String,
-    pub indexes: Vec<IndexType>,
+    pub indexes: Vec<tokenizer::IndexType>,
     pub fn_name: String,
     pub fn_params: Vec<tokenizer::Token>,
     pub sub_fn_names: Vec<String>,
@@ -79,18 +35,18 @@ pub fn parse_query(query_str: &str, db_settings: &meta::DBSettings) -> Result<Qu
     }
     let table_settings = db_settings.tables.get(&table_name).unwrap();
 
-    let mut indexes: Vec<IndexType> = Vec::new();
+    let mut indexes: Vec<tokenizer::IndexType> = Vec::new();
     while tokens.peek().is_some() && tokens.peek().unwrap().is_valid_index() {
         match tokens.next() {
-            Some(tokenizer::Token::Integer(index)) => indexes.push(IndexType::Index(index as u64)),
+            Some(tokenizer::Token::Integer(index)) => indexes.push(tokenizer::IndexType::Index(index as u64)),
             Some(tokenizer::Token::Wildcard(modifier)) => {
                 if modifier == 0 {
-                    indexes.push(IndexType::Wildcard(0));
+                    indexes.push(tokenizer::IndexType::Wildcard(0));
                     continue;
                 }
                 if table_settings.biggest_id > modifier {
                     let index = table_settings.biggest_id - modifier;
-                    indexes.push(IndexType::Index(index));
+                    indexes.push(tokenizer::IndexType::Index(index));
                     continue;
                 }
                 return Err(Error::new(ErrorKind::InvalidInput, "Invalid wildcard modifier"));
@@ -99,19 +55,42 @@ pub fn parse_query(query_str: &str, db_settings: &meta::DBSettings) -> Result<Qu
                 let start = start.to_int(table_settings);
                 let end = end.to_int(table_settings);
                 for index in start..=end {
-                    indexes.push(IndexType::Index(index));
+                    indexes.push(tokenizer::IndexType::Index(index));
                 }
             },
             Some(tokenizer::Token::Page(page)) => {
-                let page = page + 1;
-                let start = db_settings.compartment_rows as u64 * (page - 1);
-                let end = db_settings.compartment_rows as u64 * page - 1;
+                match page {
+                    tokenizer::IndexType::Index(page) => {
+                        let page = page + 1;
+                        let start = db_settings.compartment_rows as u64 * (page - 1);
+                        let end = db_settings.compartment_rows as u64 * page - 1;
 
-                for index in start..=end {
-                    if index > table_settings.biggest_id {
-                        continue;
+                        for index in start..=end {
+                            if index > table_settings.biggest_id {
+                                continue;
+                            }
+                            indexes.push(tokenizer::IndexType::Index(index));
+                        }
+                    },
+                    tokenizer::IndexType::Wildcard(modifier) => {
+                        /* The reason this syntax uses start = comp_rows * page & end = comp_rows * (page + 1)
+                         * is because the page indexing uses 0 index but the math doesn't work with
+                         * 0 obviously. So in the wildcard syntax we don't modify the page value in
+                         * start and end.
+                         */
+                        let page = (table_settings.biggest_id / db_settings.compartment_rows as u64) - modifier;
+                        let start = db_settings.compartment_rows as u64 * page;
+                        let end = db_settings.compartment_rows as u64 * (page + 1);
+
+                        println!("start: {start} end: {end}");
+
+                        for index in start..=end {
+                            if index > table_settings.biggest_id {
+                                continue;
+                            }
+                            indexes.push(tokenizer::IndexType::Index(index));
+                        }
                     }
-                    indexes.push(IndexType::Index(index));
                 }
             },
             _ => (),

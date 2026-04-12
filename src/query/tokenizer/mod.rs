@@ -1,13 +1,70 @@
 use std::collections::HashSet;
 use std::option::Option;
-use crate::{util, query};
+use std::fmt;
+use crate::{util, meta};
+
+#[derive(Debug, PartialEq)]
+pub enum IndexType {
+    Index(u64),
+    Wildcard(u64),
+}
+
+impl fmt::Display for IndexType {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            IndexType::Index(val) => {
+                write!(f, "{val}")
+            },
+            IndexType::Wildcard(modifier) => {
+                write!(f, "{modifier}")
+            },
+        }
+    }
+}
+
+impl PartialOrd for IndexType {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        match self {
+            IndexType::Index(self_v) => {
+                if let IndexType::Index(other_v) = other {
+                    Some(self_v.cmp(other_v))
+                } else {
+                    None
+                }
+            },
+            IndexType::Wildcard(self_v) => {
+                if let IndexType::Wildcard(other_v) = other {
+                    Some(self_v.cmp(other_v))
+                } else {
+                    None
+                }
+            },
+        }
+    }
+}
+
+impl IndexType {
+    pub fn to_int(&self, table_settings: &meta::TableSettings) -> u64 {
+        match self {
+            IndexType::Index(value) => *value,
+            IndexType::Wildcard(modifier) => {
+                let biggest_index = table_settings.biggest_id;
+                if biggest_index > *modifier {
+                    biggest_index - *modifier
+                } else {
+                    biggest_index
+                }
+            },
+        }
+    }
+}
 
 #[derive(Debug, PartialEq)]
 pub enum Token {
     String(String),
     Integer(i64),
     FloatingPoint(f64),
-    Page(u64),
+    Page(IndexType),
     Wildcard(u64), // value for wildcard is modifier, if it is 10 it equates to *-10
     BiggerThen,
     LessThen,
@@ -16,7 +73,7 @@ pub enum Token {
     Pipe,
     SortAscending,
     SortDescending,
-    Range((query::IndexType, query::IndexType)),
+    Range((IndexType, IndexType)),
 }
 
 impl Token {
@@ -145,23 +202,23 @@ fn try_into_range(input: &str) -> Option<Token> {
     None
 }
 
-fn index_from_str(from: &str) -> Option<query::IndexType> {
+fn index_from_str(from: &str) -> Option<IndexType> {
     if from == "*" {
-        return Some(query::IndexType::Wildcard(0));
+        return Some(IndexType::Wildcard(0));
     }
     if let Some(token) = try_subtraction(from) {
         match  token {
             Token::Wildcard(modifier) => {
-                return Some(query::IndexType::Wildcard(modifier));
+                return Some(IndexType::Wildcard(modifier));
             },
             Token::Integer(val) => {
-                return Some(query::IndexType::Index(val as u64));
+                return Some(IndexType::Index(val as u64));
             },
             _ => return None,
         }
     }
     if let Ok(index) = from.parse::<i64>() {
-        return Some(query::IndexType::Index(index as u64));
+        return Some(IndexType::Index(index as u64));
     }
     None
 }
@@ -176,8 +233,12 @@ fn try_into_page(input: &str) -> Option<Token> {
     let mut index_string = String::with_capacity(input_iter.size_hint().1.unwrap_or(0));
     input_iter.for_each(|char| index_string.push(char));
 
+    if index_string == "*" {
+        return Some(Token::Page(IndexType::Wildcard(0)));
+    }
+
     if let Ok(index) = index_string.parse::<u64>() {
-        return Some(Token::Page(index));
+        return Some(Token::Page(IndexType::Index(index)));
     }
     None
 }
