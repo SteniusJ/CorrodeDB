@@ -1,7 +1,7 @@
 use std::{
+    collections::HashMap,
     io::{BufReader, prelude::*},
     net::{TcpListener, TcpStream},
-    collections::HashMap,
 };
 
 #[derive(Eq, Hash, PartialEq, Debug)]
@@ -15,8 +15,12 @@ pub enum HTTPRequestMethods {
 }
 
 pub struct HTTPServer<'a> {
-    endpoints: HashMap<(String, HTTPRequestMethods), Box<dyn FnMut(String, HashMap<String, String>) -> String + 'a>>,
-    middleware: Vec<Box<dyn FnMut(&mut String, &mut HashMap<String, String>) -> (bool, String) + 'a>>,
+    endpoints: HashMap<
+        (String, HTTPRequestMethods),
+        Box<dyn FnMut(String, HashMap<String, String>) -> String + 'a>,
+    >,
+    middleware:
+        Vec<Box<dyn FnMut(&mut String, &mut HashMap<String, String>) -> (bool, String) + 'a>>,
     address: String,
 }
 
@@ -40,18 +44,27 @@ impl<'a> HTTPServer<'a> {
         }
     }
     /// Adds endpoint to http server
-    pub fn add_endpoint(&mut self, enpoint: &str, method: HTTPRequestMethods, closure: impl FnMut(String, HashMap<String, String>) -> String + 'a) {
-        self.endpoints.insert((enpoint.to_string(), method), Box::new(closure));
+    pub fn add_endpoint(
+        &mut self,
+        enpoint: &str,
+        method: HTTPRequestMethods,
+        closure: impl FnMut(String, HashMap<String, String>) -> String + 'a,
+    ) {
+        self.endpoints
+            .insert((enpoint.to_string(), method), Box::new(closure));
     }
     /// Adds middleware to http server
     /// All middleware is executed before any endpoint access
-    pub fn add_middleware(&mut self, closure: impl FnMut(&mut String, &mut HashMap<String, String>) -> (bool, String) + 'a) {
+    pub fn add_middleware(
+        &mut self,
+        closure: impl FnMut(&mut String, &mut HashMap<String, String>) -> (bool, String) + 'a,
+    ) {
         self.middleware.push(Box::new(closure));
     }
     /// Server starts listening to http trafic
     pub fn listen(&mut self) {
         let listener = create_tcp_listener(self.address.as_str());
-        
+
         println!("http server listening on: {}", self.address.as_str());
 
         for stream in listener.incoming() {
@@ -64,17 +77,29 @@ impl<'a> HTTPServer<'a> {
 
             let mut res = String::new();
             for middleware in &mut self.middleware {
-                let middleware_res = middleware(&mut request_header.content, &mut request_header.url_parameters);
+                let middleware_res = middleware(
+                    &mut request_header.content,
+                    &mut request_header.url_parameters,
+                );
                 if !middleware_res.0 {
-                    res = create_http_response(401, "application/json", format!("\"error\":\"{}\"", middleware_res.1).as_str());
+                    res = create_http_response(
+                        401,
+                        "application/json",
+                        format!("\"error\":\"{}\"", middleware_res.1).as_str(),
+                    );
                     break;
                 }
             }
 
             if res.is_empty() {
-                res = match self.endpoints.get_mut(&(request_header.endpoint, request_header.method)) {
+                res = match self
+                    .endpoints
+                    .get_mut(&(request_header.endpoint, request_header.method))
+                {
                     Some(ep) => ep(request_header.content, request_header.url_parameters),
-                    None => create_http_response(404, "text/html; charset=utf-8", "Endpoint not found"),
+                    None => {
+                        create_http_response(404, "text/html; charset=utf-8", "Endpoint not found")
+                    }
                 };
             }
 
@@ -88,7 +113,13 @@ impl<'a> HTTPServer<'a> {
 
 /// Formats http response
 pub fn create_http_response(status_code: u16, content_type: &str, content: &str) -> String {
-    format!("{}\r\nContent-Length: {}\r\nContent-Type: {}\r\n\r\n{}", parse_http_status_code(status_code), content.len(), content_type, content)
+    format!(
+        "{}\r\nContent-Length: {}\r\nContent-Type: {}\r\n\r\n{}",
+        parse_http_status_code(status_code),
+        content.len(),
+        content_type,
+        content
+    )
 }
 
 /// Creates tcp listener for give address
@@ -147,7 +178,7 @@ fn parse_http_request_header(buf_reader: &mut BufReader<&mut TcpStream>) -> HTTP
                     Err(e) => {
                         println!("Http request body read failed!\n{e}");
                         break;
-                    },
+                    }
                 }
             }
             request_header.content = String::from_utf8_lossy(&body).to_string();
@@ -170,15 +201,16 @@ fn parse_http_request_header(buf_reader: &mut BufReader<&mut TcpStream>) -> HTTP
                     let mut url_param_split = match url_param_split.next() {
                         Some(v) => v,
                         None => break,
-                    }.split("=");
+                    }
+                    .split("=");
 
                     let name = match url_param_split.next() {
                         Some(v) => v.to_string(),
-                        None => break
+                        None => break,
                     };
                     let value = match url_param_split.next() {
                         Some(v) => v.to_string(),
-                        None => break
+                        None => break,
                     };
 
                     request_header.url_parameters.insert(name, value);
@@ -189,8 +221,13 @@ fn parse_http_request_header(buf_reader: &mut BufReader<&mut TcpStream>) -> HTTP
         }
 
         match line_split.get(0).unwrap().to_lowercase().as_str() {
-            "content-type" => request_header.content_type = line_split.get(1).unwrap_or(&"").to_string(),
-            "content-length" => request_header.content_length = line_split.get(1).unwrap_or(&"").parse().unwrap_or(0),
+            "content-type" => {
+                request_header.content_type = line_split.get(1).unwrap_or(&"").to_string()
+            }
+            "content-length" => {
+                request_header.content_length =
+                    line_split.get(1).unwrap_or(&"").parse().unwrap_or(0)
+            }
             _ => (),
         }
     }

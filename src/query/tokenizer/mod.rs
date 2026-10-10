@@ -1,6 +1,6 @@
+use crate::{query, util};
 use std::collections::HashSet;
 use std::option::Option;
-use crate::{util, query};
 
 #[derive(Debug, PartialEq)]
 pub enum Token {
@@ -28,7 +28,7 @@ impl Token {
                 } else {
                     false
                 }
-            },
+            }
             Token::Wildcard(_) => true,
             Token::Range(_) => true,
             Token::Page(_) => true,
@@ -139,7 +139,10 @@ fn try_into_range(input: &str) -> Option<Token> {
         return None;
     }
 
-    if let (Some(range_start), Some(range_end)) = (index_from_str(range_split[0]), index_from_str(range_split[1])) {
+    if let (Some(range_start), Some(range_end)) = (
+        index_from_str(range_split[0]),
+        index_from_str(range_split[1]),
+    ) {
         return Some(Token::Range((range_start, range_end)));
     }
     None
@@ -150,13 +153,13 @@ fn index_from_str(from: &str) -> Option<query::IndexType> {
         return Some(query::IndexType::Wildcard(0));
     }
     if let Some(token) = try_subtraction(from) {
-        match  token {
+        match token {
             Token::Wildcard(modifier) => {
                 return Some(query::IndexType::Wildcard(modifier));
-            },
+            }
             Token::Integer(val) => {
                 return Some(query::IndexType::Index(val as u64));
-            },
+            }
             _ => return None,
         }
     }

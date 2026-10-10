@@ -1,17 +1,13 @@
-use std::fs::{
-    File,
-    DirBuilder,
-    ReadDir,
-};
-use std::fs;
-use std::path::Path;
-use std::io::prelude::*;
 use std::collections::HashMap;
-use std::io::{Result, Error, ErrorKind};
+use std::fs;
+use std::fs::{DirBuilder, File, ReadDir};
+use std::io::prelude::*;
+use std::io::{Error, ErrorKind, Result};
+use std::path::Path;
 
 #[derive(Debug)]
 pub enum Status {
-    Success
+    Success,
 }
 
 pub struct FileSystem {
@@ -22,10 +18,8 @@ impl FileSystem {
     /// Creates new FileSystem
     pub fn new() -> FileSystem {
         let new_cache: HashMap<String, Vec<String>> = HashMap::new();
-        
-        FileSystem {
-            cache: new_cache
-        }
+
+        FileSystem { cache: new_cache }
     }
 
     /// Opens a file into cache
@@ -48,30 +42,36 @@ impl FileSystem {
                 }
 
                 file = File::open(file_name)?;
-            },
+            }
         }
 
         let mut contents = String::new();
         file.read_to_string(&mut contents)?;
 
-        self.add_to_cache(file_name.to_string(), contents.lines().map(String::from).collect());
+        self.add_to_cache(
+            file_name.to_string(),
+            contents.lines().map(String::from).collect(),
+        );
 
         Ok(Status::Success)
     }
-    
+
     // wrapper for fs::remove_file
     pub fn remove(&mut self, file_name: &str) -> Result<()> {
         fs::remove_file(file_name)
     }
-    
+
     /// Writes data to cache if file is stored in cache
     /// Overwrites Current data in cache with the new
     pub fn write_to_cache(&mut self, file_name: &str, new_content: String) -> Result<Status> {
         if !self.is_in_cache(file_name) {
-            return Err(Error::new(ErrorKind::NotFound, "File not in cache"))
+            return Err(Error::new(ErrorKind::NotFound, "File not in cache"));
         }
 
-        self.add_to_cache(file_name.to_string(), new_content.lines().map(String::from).collect());
+        self.add_to_cache(
+            file_name.to_string(),
+            new_content.lines().map(String::from).collect(),
+        );
 
         Ok(Status::Success)
     }
@@ -97,8 +97,11 @@ impl FileSystem {
                     let line_string = file_contents[line].clone();
                     return Ok(line_string);
                 }
-                return Err(Error::new(ErrorKind::NotFound, "Line number outside file size"))
-            },
+                return Err(Error::new(
+                    ErrorKind::NotFound,
+                    "Line number outside file size",
+                ));
+            }
             Err(e) => {
                 return Err(e);
             }
@@ -121,8 +124,8 @@ impl FileSystem {
                     self.cache.remove(file_name);
                     self.cache.shrink_to_fit();
 
-                    return Ok(Status::Success)
-                },
+                    return Ok(Status::Success);
+                }
                 Err(e) => return Err(e),
             }
         } else {
@@ -187,7 +190,7 @@ impl FileSystem {
     /// Should be used when file contents are no longer needed but no write to disk is necessary
     pub fn drop_from_cache(&mut self, file_name: &str) -> Result<Status> {
         if !self.is_in_cache(file_name) {
-            return Err(Error::new(ErrorKind::NotFound, "File not in cache"))
+            return Err(Error::new(ErrorKind::NotFound, "File not in cache"));
         }
 
         self.cache.remove(file_name);
@@ -204,7 +207,7 @@ impl FileSystem {
     /// Returns true/false if data is already in cache
     pub fn is_in_cache(&mut self, file_name: &str) -> bool {
         if self.cache.contains_key(file_name) {
-            return true
+            return true;
         }
         false
     }
@@ -233,22 +236,38 @@ mod tests {
         let mut file_system = FileSystem::new();
 
         file_system.open(TEST_READ_FILE_PATH).unwrap();
-        file_system.open(TEST_READ_FILE_PATH).expect_err("File open succeeded even when opening a already open file!");
-        
-        assert_eq!(&vec![String::from("hello world"), String::from("hello world1")], file_system.cache.get(TEST_READ_FILE_PATH).unwrap());
+        file_system
+            .open(TEST_READ_FILE_PATH)
+            .expect_err("File open succeeded even when opening a already open file!");
+
+        assert_eq!(
+            &vec![String::from("hello world"), String::from("hello world1")],
+            file_system.cache.get(TEST_READ_FILE_PATH).unwrap()
+        );
     }
 
     #[test]
     fn test_file_system_read() {
         let mut file_system = FileSystem::new();
 
-        file_system.open(TEST_READ_FILE_PATH).expect("File open failed, not relevant to this test");
-        
-        let result = file_system.read_from_cache(TEST_READ_FILE_PATH).expect("File read failed");
-        let result_single_line = file_system.read_line_from_cache(TEST_READ_FILE_PATH, 0).unwrap();
-        file_system.read_line_from_cache(TEST_READ_FILE_PATH, 3).expect_err("Filesystem read a line that doesn't exist");
+        file_system
+            .open(TEST_READ_FILE_PATH)
+            .expect("File open failed, not relevant to this test");
 
-        assert_eq!(result, vec![String::from("hello world"), String::from("hello world1")]);
+        let result = file_system
+            .read_from_cache(TEST_READ_FILE_PATH)
+            .expect("File read failed");
+        let result_single_line = file_system
+            .read_line_from_cache(TEST_READ_FILE_PATH, 0)
+            .unwrap();
+        file_system
+            .read_line_from_cache(TEST_READ_FILE_PATH, 3)
+            .expect_err("Filesystem read a line that doesn't exist");
+
+        assert_eq!(
+            result,
+            vec![String::from("hello world"), String::from("hello world1")]
+        );
         assert_eq!(result_single_line, String::from("hello world"));
     }
 
@@ -256,17 +275,27 @@ mod tests {
     fn test_file_system_write() {
         let mut file_system = FileSystem::new();
         let mut rng = rand::rng();
-        let rand_uuid = format!("0x{:X}",rng.random::<u128>());
+        let rand_uuid = format!("0x{:X}", rng.random::<u128>());
 
-        file_system.open(TEST_WRITE_FILE_PATH).expect("File open failed, not relevant to this test");
-        file_system.write_to_cache(TEST_WRITE_FILE_PATH, rand_uuid.clone()).unwrap();
+        file_system
+            .open(TEST_WRITE_FILE_PATH)
+            .expect("File open failed, not relevant to this test");
+        file_system
+            .write_to_cache(TEST_WRITE_FILE_PATH, rand_uuid.clone())
+            .unwrap();
         let cache_result = file_system.read_from_cache(TEST_WRITE_FILE_PATH).unwrap();
         assert_eq!(cache_result.last().unwrap(), &rand_uuid);
 
-        file_system.write_cache_to_disk(TEST_WRITE_FILE_PATH).unwrap();
+        file_system
+            .write_cache_to_disk(TEST_WRITE_FILE_PATH)
+            .unwrap();
 
-        file_system.open(TEST_WRITE_FILE_PATH).expect("File open failed, not relevant to this test");
-        let result = file_system.read_from_cache(TEST_WRITE_FILE_PATH).expect("File read failed, not relevant to this test");
+        file_system
+            .open(TEST_WRITE_FILE_PATH)
+            .expect("File open failed, not relevant to this test");
+        let result = file_system
+            .read_from_cache(TEST_WRITE_FILE_PATH)
+            .expect("File read failed, not relevant to this test");
         assert_eq!(result.last().unwrap(), &rand_uuid);
     }
 }

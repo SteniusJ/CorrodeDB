@@ -1,11 +1,15 @@
-use std::io::{Result, Error, ErrorKind};
-use std::collections::HashMap;
 use crate::db_engine::DBDatatype;
-use crate::{util, query, file, meta};
+use crate::{file, meta, query, util};
+use std::collections::HashMap;
+use std::io::{Error, ErrorKind, Result};
 
 /// Reads data from database
 /// Default functionality
-pub fn read_from_db(db_settings: &mut meta::DBSettings, file_system: &mut file::FileSystem, query: &query::QueryResult) -> Result<Vec<HashMap<String, DBDatatype>>> {
+pub fn read_from_db(
+    db_settings: &mut meta::DBSettings,
+    file_system: &mut file::FileSystem,
+    query: &query::QueryResult,
+) -> Result<Vec<HashMap<String, DBDatatype>>> {
     let mut result: Vec<HashMap<String, DBDatatype>> = Vec::new();
     let col_settings = &db_settings.tables.get(&query.table_name).unwrap().columns;
 
@@ -14,7 +18,13 @@ pub fn read_from_db(db_settings: &mut meta::DBSettings, file_system: &mut file::
             query::IndexType::Index(i) => {
                 let (line, file_name, index) = util::get_line_fname_idx(db_settings, query, *i);
 
-                if index > db_settings.tables.get(&query.table_name).unwrap().biggest_id {
+                if index
+                    > db_settings
+                        .tables
+                        .get(&query.table_name)
+                        .unwrap()
+                        .biggest_id
+                {
                     return Err(Error::new(ErrorKind::Other, "Index out of table range"));
                 }
 
@@ -27,23 +37,29 @@ pub fn read_from_db(db_settings: &mut meta::DBSettings, file_system: &mut file::
                         return Err(Error::new(ErrorKind::Other, "Index out of table range"));
                     }
                 };
-            },
+            }
             query::IndexType::Wildcard(_) => {
                 let dir_name = format!("./tables/{}", query.table_name);
                 let Ok(dir) = file_system.read_folder(&dir_name) else {
-                    panic!("Critical failiure! Table '{}' does not have a folder", query.table_name);
+                    panic!(
+                        "Critical failiure! Table '{}' does not have a folder",
+                        query.table_name
+                    );
                 };
-                let mut containers: Vec<u64> = dir.map(|res_dir_entry| 
-                    res_dir_entry.unwrap()
-                        .file_name()
-                        .to_str()
-                        .unwrap()
-                        .parse::<u64>()
-                        .unwrap())
+                let mut containers: Vec<u64> = dir
+                    .map(|res_dir_entry| {
+                        res_dir_entry
+                            .unwrap()
+                            .file_name()
+                            .to_str()
+                            .unwrap()
+                            .parse::<u64>()
+                            .unwrap()
+                    })
                     .collect();
                 containers.sort(); // This is necessary to make sure that the indexes in the
-                                    // response are in order. Looping trough ReadDir yields in a
-                                    // iterator which is not always in order.
+                // response are in order. Looping trough ReadDir yields in a
+                // iterator which is not always in order.
 
                 for container in containers {
                     let file_name = format!("{}/{}", dir_name, container);
@@ -53,24 +69,28 @@ pub fn read_from_db(db_settings: &mut meta::DBSettings, file_system: &mut file::
                         Err(e) => {
                             println!("File open failed: {e}");
                             continue;
-                        },
+                        }
                     }
 
                     match file_system.read_from_cache(&file_name) {
                         Ok(contents) => {
                             for (line_index, content) in contents.iter().enumerate() {
                                 if !content.is_empty() {
-                                    result.push(util::parse_db_line(content.clone(), util::get_index(line_index as u64, container, db_settings), &col_settings));
+                                    result.push(util::parse_db_line(
+                                        content.clone(),
+                                        util::get_index(line_index as u64, container, db_settings),
+                                        &col_settings,
+                                    ));
                                 }
                             }
-                        },
+                        }
                         Err(e) => {
                             println!("Read failed: {e}");
                             continue;
-                        },
+                        }
                     }
                 }
-            },
+            }
         }
     }
 
@@ -80,13 +100,20 @@ pub fn read_from_db(db_settings: &mut meta::DBSettings, file_system: &mut file::
 
 /// write function logic
 /// Writes data to database
-pub fn write_to_db(db_settings: &mut meta::DBSettings, file_system: &mut file::FileSystem, query: &query::QueryResult) -> Result<(String, Vec<i64>)> {
+pub fn write_to_db(
+    db_settings: &mut meta::DBSettings,
+    file_system: &mut file::FileSystem,
+    query: &query::QueryResult,
+) -> Result<(String, Vec<i64>)> {
     let write_data = &query.fn_params;
     let columns = &db_settings.tables.get(&query.table_name).unwrap().columns;
     let mut affected_indexes: Vec<i64> = Vec::new();
 
     if write_data.len() != columns.len() {
-        return Err(Error::new(ErrorKind::InvalidInput, "The number of arguments does not match the number of data columns in the table"));
+        return Err(Error::new(
+            ErrorKind::InvalidInput,
+            "The number of arguments does not match the number of data columns in the table",
+        ));
     }
 
     // Check if given data matches column data types
@@ -96,23 +123,35 @@ pub fn write_to_db(db_settings: &mut meta::DBSettings, file_system: &mut file::F
         match col_data.value {
             meta::ColValue::NumberI => {
                 if !row_data.1.is_int() {
-                    return Err(Error::new(ErrorKind::InvalidInput, "Data type does not match column type which is NumberI"));
+                    return Err(Error::new(
+                        ErrorKind::InvalidInput,
+                        "Data type does not match column type which is NumberI",
+                    ));
                 }
-            },
+            }
             meta::ColValue::NumberF => {
                 if !row_data.1.is_float() {
-                    return Err(Error::new(ErrorKind::InvalidInput, "Data type does not match column type which is NumberF"));
+                    return Err(Error::new(
+                        ErrorKind::InvalidInput,
+                        "Data type does not match column type which is NumberF",
+                    ));
                 }
-            },
+            }
             meta::ColValue::VarChar => {
                 if !row_data.1.is_string() {
-                    return Err(Error::new(ErrorKind::InvalidInput, "Data type does not match column type which is VarChar"));
+                    return Err(Error::new(
+                        ErrorKind::InvalidInput,
+                        "Data type does not match column type which is VarChar",
+                    ));
                 }
             }
         }
     }
 
-    let write_data: Vec<String> = write_data.into_iter().map(move |token| util::sanitize_db_entry(token.to_string())).collect();
+    let write_data: Vec<String> = write_data
+        .into_iter()
+        .map(move |token| util::sanitize_db_entry(token.to_string()))
+        .collect();
 
     for index in &query.indexes {
         match index {
@@ -126,7 +165,10 @@ pub fn write_to_db(db_settings: &mut meta::DBSettings, file_system: &mut file::F
                 if file_data.len() > line as usize {
                     file_data[line as usize] = write_data.join(",");
                 } else {
-                    return Err(Error::new(ErrorKind::Other, "Attempting to write outside index bounds"));
+                    return Err(Error::new(
+                        ErrorKind::Other,
+                        "Attempting to write outside index bounds",
+                    ));
                 }
 
                 match file_system.write_to_cache(&file_name, file_data.join("\n")) {
@@ -134,14 +176,26 @@ pub fn write_to_db(db_settings: &mut meta::DBSettings, file_system: &mut file::F
                     Err(e) => return Err(e),
                 }
                 affected_indexes.push(index as i64);
-            },
+            }
             query::IndexType::Wildcard(_) => {
-                let table_max_index = if db_settings.tables.get(&query.table_name).unwrap().biggest_id > 0 {
-                    db_settings.tables.get(&query.table_name).unwrap().biggest_id + 1
+                let table_max_index = if db_settings
+                    .tables
+                    .get(&query.table_name)
+                    .unwrap()
+                    .biggest_id
+                    > 0
+                {
+                    db_settings
+                        .tables
+                        .get(&query.table_name)
+                        .unwrap()
+                        .biggest_id
+                        + 1
                 } else {
                     0
                 };
-                let (_line, file_name, index) = util::get_line_fname_idx(db_settings, query, table_max_index);
+                let (_line, file_name, index) =
+                    util::get_line_fname_idx(db_settings, query, table_max_index);
 
                 let Ok(mut file_data) = util::file_read(&file_name, file_system) else {
                     return Err(Error::new(ErrorKind::Other, "File read error"));
@@ -155,7 +209,7 @@ pub fn write_to_db(db_settings: &mut meta::DBSettings, file_system: &mut file::F
                 } else {
                     return Err(Error::new(ErrorKind::InvalidInput, "Write failed"));
                 }
-            },
+            }
         }
     }
 
@@ -164,15 +218,19 @@ pub fn write_to_db(db_settings: &mut meta::DBSettings, file_system: &mut file::F
         Err(e) => {
             file_system.drop_entire_cache();
             Err(e)
-        },
+        }
     }
-} 
+}
 
 /// Remove function logic
 ///
 /// Removes data from database
 /// Overwrites data with empty string effectively deleting it
-pub fn remove_from_db(db_settings: &mut meta::DBSettings, file_system: &mut file::FileSystem, query: &query::QueryResult) -> Result<(String, Vec<i64>)> {
+pub fn remove_from_db(
+    db_settings: &mut meta::DBSettings,
+    file_system: &mut file::FileSystem,
+    query: &query::QueryResult,
+) -> Result<(String, Vec<i64>)> {
     let mut affected_indexes: Vec<i64> = Vec::new();
 
     for index in &query.indexes {
@@ -191,7 +249,7 @@ pub fn remove_from_db(db_settings: &mut meta::DBSettings, file_system: &mut file
                     Err(e) => return Err(e),
                 }
                 affected_indexes.push(index as i64);
-            },
+            }
             query::IndexType::Wildcard(_) => {
                 let dir_name = format!("./tables/{}", query.table_name);
                 let Ok(dir) = file_system.read_folder(&dir_name) else {
@@ -211,12 +269,12 @@ pub fn remove_from_db(db_settings: &mut meta::DBSettings, file_system: &mut file
                     match file_system.remove(&file_dir) {
                         Ok(_) => {
                             db_settings.reset_id(&query.table_name);
-                        },
+                        }
                         Err(e) => return Err(e),
                     }
                 }
                 return Ok((String::from("table dropped"), Vec::new()));
-            },
+            }
         }
     }
 
@@ -226,6 +284,6 @@ pub fn remove_from_db(db_settings: &mut meta::DBSettings, file_system: &mut file
         Err(e) => {
             file_system.drop_entire_cache();
             Err(e)
-        },
+        }
     }
 }

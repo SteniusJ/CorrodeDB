@@ -1,9 +1,9 @@
+use crate::{db_engine, file, meta, query};
 use regex::Regex;
-use std::io::{Result, Error, ErrorKind};
-use crate::{file, query, meta, db_engine};
-use std::collections::HashMap;
 use std::cmp::Ordering;
+use std::collections::HashMap;
 use std::collections::HashSet;
+use std::io::{Error, ErrorKind, Result};
 
 /// Splits str by char ignoring those that have been escaped
 pub fn escape_split(input: &str, split_char: char) -> Vec<&str> {
@@ -16,7 +16,7 @@ pub fn escape_split(input: &str, split_char: char) -> Vec<&str> {
             skip = false;
             continue;
         }
-        
+
         if char == '\\' {
             skip = true;
             continue;
@@ -45,7 +45,7 @@ pub fn escape_split_by_many(input: &str, split_set: HashSet<char>) -> Vec<&str> 
             skip = false;
             continue;
         }
-        
+
         if char == '\\' {
             skip = true;
             continue;
@@ -64,7 +64,7 @@ pub fn escape_split_by_many(input: &str, split_set: HashSet<char>) -> Vec<&str> 
         if split_set.get(&char).is_some() && !building_string {
             let split: &str;
             if building_string_proc {
-                split = input.get(last_split_i+1..index-1).unwrap();
+                split = input.get(last_split_i + 1..index - 1).unwrap();
             } else {
                 split = input.get(last_split_i..index).unwrap();
             }
@@ -77,7 +77,7 @@ pub fn escape_split_by_many(input: &str, split_set: HashSet<char>) -> Vec<&str> 
     }
     let split: &str;
     if building_string_proc {
-        split = input.get(last_split_i+1..input.len()-1).unwrap();
+        split = input.get(last_split_i + 1..input.len() - 1).unwrap();
     } else {
         split = input.get(last_split_i..input.len()).unwrap();
     }
@@ -89,7 +89,7 @@ pub fn escape_split_by_many(input: &str, split_set: HashSet<char>) -> Vec<&str> 
 
 pub fn sanitize_db_entry(input: String) -> String {
     let mut sanitized_string = String::with_capacity(input.len()); // sanitized string can only be larger than the input so it is
-                                                                           // more performant to assume that the string will be at least of input length
+    // more performant to assume that the string will be at least of input length
     for char in input.chars() {
         match char {
             ',' => sanitized_string.push_str(r"\,"),
@@ -107,16 +107,50 @@ pub fn rehydrate_db_entry(input: String) -> String {
 }
 
 /// Parses program arguments
-pub fn parse_program_args(args: Vec<String>) -> Vec<(String, String)>{
-    let arguments_string = args.join(" ");
-    let re = Regex::new(r"(?<flag>-[[:alpha:]]*) (?<param>[[:ascii:]-- -]*)").unwrap();
+pub fn parse_program_args(args: Vec<String>) -> Vec<(String, String)> {
+    // let arguments_string = args.join(" ");
+    // let re = Regex::new(r"(?<flag>-[[:alpha:]]*) (?<param>[[:ascii:]-- -]*)").unwrap();
 
+    // let mut parsed_args: Vec<(String, String)> = Vec::new();
+
+    // let captures = re.captures_iter(&arguments_string);
+
+    // for argument in captures {
+    //     parsed_args.push((argument["flag"].to_string(), argument["param"].to_string()));
+    // }
+
+    // parsed_args
     let mut parsed_args: Vec<(String, String)> = Vec::new();
 
-    let captures = re.captures_iter(&arguments_string);
+    for (i, arg) in args.iter().enumerate() {
+        if !arg.len() < 2 {
+            continue;
+        }
 
-    for argument in captures {
-        parsed_args.push((argument["flag"].to_string(), argument["param"].to_string()));
+        // Single dash (-h) or double dash (--help) check
+        match (arg.chars().nth(0), arg.chars().nth(1)) {
+            (Some('-'), Some('-')) => {
+                if args.get(i + 1).unwrap_or(&String::new()).chars().nth(0) != Some('-') {
+                    parsed_args.push((
+                        arg[2..].into(),
+                        args.get(i + 1).unwrap_or(&String::new()).into(),
+                    ));
+                    continue;
+                }
+                parsed_args.push((arg[2..].into(), String::new()));
+            }
+            (Some('-'), _) => {
+                if args.get(i + 1).unwrap_or(&String::new()).chars().nth(0) != Some('-') {
+                    parsed_args.push((
+                        arg.chars().nth(1).unwrap_or_default().into(),
+                        args.get(i + 1).unwrap_or(&String::new()).into(),
+                    ));
+                    continue;
+                }
+                parsed_args.push((arg[1..].into(), String::new()));
+            }
+            _ => (),
+        }
     }
 
     parsed_args
@@ -140,9 +174,17 @@ pub fn file_read(file_name: &str, file_system: &mut file::FileSystem) -> Result<
 }
 
 /// Returns line, function name and database index
-pub fn get_line_fname_idx(db_settings: &meta::DBSettings, query: &query::QueryResult, index: u64) -> (u64, String, u64) {
+pub fn get_line_fname_idx(
+    db_settings: &meta::DBSettings,
+    query: &query::QueryResult,
+    index: u64,
+) -> (u64, String, u64) {
     let container = num::integer::div_floor(index, db_settings.compartment_rows as u64);
-    let line = if index < db_settings.compartment_rows as u64 {index} else {index - (db_settings.compartment_rows as u64 * container)};
+    let line = if index < db_settings.compartment_rows as u64 {
+        index
+    } else {
+        index - (db_settings.compartment_rows as u64 * container)
+    };
     let file_name = format!("./tables/{}/{}", query.table_name, container);
     let index = get_index(line, container, db_settings);
 
@@ -155,7 +197,11 @@ pub fn get_index(line: u64, container: u64, db_settings: &meta::DBSettings) -> u
 }
 
 /// Writes to database
-pub fn file_write(file_name: &str, file_data: Vec<String>, file_system: &mut file::FileSystem) -> bool {
+pub fn file_write(
+    file_name: &str,
+    file_data: Vec<String>,
+    file_system: &mut file::FileSystem,
+) -> bool {
     match file_system.write_to_cache(file_name, file_data.join("\n")) {
         Ok(_) => (),
         Err(_) => {
@@ -165,7 +211,7 @@ pub fn file_write(file_name: &str, file_data: Vec<String>, file_system: &mut fil
 
     match file_system.write_cache_to_disk(file_name) {
         Ok(_) => return true,
-        Err(_) => return false, 
+        Err(_) => return false,
     }
 }
 
@@ -177,7 +223,7 @@ pub fn read_line(file_name: &str, file_system: &mut file::FileSystem, line: u64)
         Err(e) => {
             return Err(e);
         }
-    } 
+    }
 
     match file_system.read_line_from_cache(file_name, line as usize) {
         Ok(content) => {
@@ -186,25 +232,41 @@ pub fn read_line(file_name: &str, file_system: &mut file::FileSystem, line: u64)
             }
 
             return Err(Error::new(ErrorKind::Other, "content is empty"));
-        },
+        }
         Err(e) => {
             return Err(e);
         }
     }
 }
 
-pub fn parse_db_line(line: String, index: u64, col_settings: &Vec<meta::ColSettings>) -> HashMap<String, db_engine::DBDatatype> {
+pub fn parse_db_line(
+    line: String,
+    index: u64,
+    col_settings: &Vec<meta::ColSettings>,
+) -> HashMap<String, db_engine::DBDatatype> {
     let split_line = escape_split(line.as_str(), ',');
     let mut row_content: HashMap<String, db_engine::DBDatatype> = HashMap::new();
-    row_content.insert(String::from("index"), db_engine::DBDatatype::NumberI(index as i64));
+    row_content.insert(
+        String::from("index"),
+        db_engine::DBDatatype::NumberI(index as i64),
+    );
 
     for (column_index, column_content) in split_line.iter().enumerate() {
         let column_name = col_settings[column_index].name.clone();
 
         match col_settings[column_index].value {
-            meta::ColValue::NumberI => row_content.insert(column_name, db_engine::DBDatatype::NumberI(column_content.parse().unwrap())),
-            meta::ColValue::NumberF => row_content.insert(column_name, db_engine::DBDatatype::NumberF(column_content.parse().unwrap())),
-            meta::ColValue::VarChar => row_content.insert(column_name, db_engine::DBDatatype::VarChar(column_content.to_string())),
+            meta::ColValue::NumberI => row_content.insert(
+                column_name,
+                db_engine::DBDatatype::NumberI(column_content.parse().unwrap()),
+            ),
+            meta::ColValue::NumberF => row_content.insert(
+                column_name,
+                db_engine::DBDatatype::NumberF(column_content.parse().unwrap()),
+            ),
+            meta::ColValue::VarChar => row_content.insert(
+                column_name,
+                db_engine::DBDatatype::VarChar(column_content.to_string()),
+            ),
         };
     }
 
@@ -216,7 +278,7 @@ pub fn db_result_prettify(result: Vec<HashMap<String, db_engine::DBDatatype>>) -
 
     for row_data in result {
         pretty_string.push_str("{\n");
-        
+
         for (col_name, col_data) in row_data {
             let col_string = format!("  {col_name}: {col_data:?}\n");
             pretty_string.push_str(&col_string);
@@ -227,9 +289,15 @@ pub fn db_result_prettify(result: Vec<HashMap<String, db_engine::DBDatatype>>) -
     pretty_string
 }
 
-pub fn merge_sort(data: &mut Vec<HashMap<String, db_engine::DBDatatype>>, sort_order: &query::tokenizer::Token, sort_column: &str, left: usize, right: usize) -> Result<()> {
+pub fn merge_sort(
+    data: &mut Vec<HashMap<String, db_engine::DBDatatype>>,
+    sort_order: &query::tokenizer::Token,
+    sort_column: &str,
+    left: usize,
+    right: usize,
+) -> Result<()> {
     if data.len() <= 1 {
-        return Ok(())
+        return Ok(());
     }
 
     if left < right {
@@ -247,15 +315,31 @@ pub fn merge_sort(data: &mut Vec<HashMap<String, db_engine::DBDatatype>>, sort_o
     Ok(())
 }
 
-fn merge(data: &mut Vec<HashMap<String, db_engine::DBDatatype>>, sort_order: &query::tokenizer::Token, sort_column: &str, mut start: usize, mut mid: usize, end: usize) -> Result<()>{
+fn merge(
+    data: &mut Vec<HashMap<String, db_engine::DBDatatype>>,
+    sort_order: &query::tokenizer::Token,
+    sort_column: &str,
+    mut start: usize,
+    mut mid: usize,
+    end: usize,
+) -> Result<()> {
     let mut start2 = mid + 1;
     let expected_order = match sort_order {
         query::tokenizer::Token::SortAscending => Ordering::Less,
         query::tokenizer::Token::SortDescending => Ordering::Greater,
-        ord => return Err(Error::new(ErrorKind::InvalidInput, format!("{ord:?} is not a valid sorting order"))),
+        ord => {
+            return Err(Error::new(
+                ErrorKind::InvalidInput,
+                format!("{ord:?} is not a valid sorting order"),
+            ));
+        }
     };
 
-    let Some(order) = data[mid].get(sort_column).unwrap().partial_cmp(data[start2].get(sort_column).unwrap()) else {
+    let Some(order) = data[mid]
+        .get(sort_column)
+        .unwrap()
+        .partial_cmp(data[start2].get(sort_column).unwrap())
+    else {
         return Err(Error::new(ErrorKind::Other, "not reachable"));
     };
     if order == expected_order || order == Ordering::Equal {
@@ -263,7 +347,11 @@ fn merge(data: &mut Vec<HashMap<String, db_engine::DBDatatype>>, sort_order: &qu
     }
 
     while start <= mid && start2 <= end {
-        let Some(order) = data[start].get(sort_column).unwrap().partial_cmp(data[start2].get(sort_column).unwrap()) else {
+        let Some(order) = data[start]
+            .get(sort_column)
+            .unwrap()
+            .partial_cmp(data[start2].get(sort_column).unwrap())
+        else {
             return Err(Error::new(ErrorKind::Other, "not reachable"));
         };
         if order == expected_order || order == Ordering::Equal {
@@ -283,6 +371,6 @@ fn merge(data: &mut Vec<HashMap<String, db_engine::DBDatatype>>, sort_order: &qu
             start2 += 1;
         }
     }
- 
+
     Ok(())
 }

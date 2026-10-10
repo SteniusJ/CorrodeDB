@@ -1,7 +1,7 @@
-use std::collections::HashMap;
-use std::io::{Result, Error, ErrorKind};
-use std::option::Option;
 use crate::{file, meta, query};
+use std::collections::HashMap;
+use std::io::{Error, ErrorKind, Result};
+use std::option::Option;
 
 mod db_functions;
 mod db_sub_functions;
@@ -14,7 +14,7 @@ pub enum DBDatatype {
 }
 
 impl DBDatatype {
-    pub fn as_f64(&self) -> Option<f64>{
+    pub fn as_f64(&self) -> Option<f64> {
         if let DBDatatype::NumberF(v) = self {
             return Some(*v);
         }
@@ -55,19 +55,19 @@ impl DBDatatype {
                     return true;
                 }
                 return false;
-            },
+            }
             DBDatatype::NumberF(_) => {
                 if let DBDatatype::NumberF(_) = other {
                     return true;
                 }
                 return false;
-            },
+            }
             DBDatatype::VarChar(_) => {
                 if let DBDatatype::VarChar(_) = other {
                     return true;
                 }
                 return false;
-            },
+            }
         }
     }
 }
@@ -81,21 +81,21 @@ impl PartialEq for DBDatatype {
                 } else {
                     false
                 }
-            },
+            }
             DBDatatype::NumberF(self_v) => {
                 if let DBDatatype::NumberF(other_v) = other {
                     self_v == other_v
                 } else {
                     false
                 }
-            },
+            }
             DBDatatype::VarChar(self_v) => {
                 if let DBDatatype::VarChar(other_v) = other {
                     self_v == other_v
                 } else {
                     false
                 }
-            },
+            }
         }
     }
 }
@@ -109,14 +109,14 @@ impl PartialOrd for DBDatatype {
                 } else {
                     None
                 }
-            },
+            }
             DBDatatype::NumberF(self_v) => {
-                 if let DBDatatype::NumberF(other_v) = other {
+                if let DBDatatype::NumberF(other_v) = other {
                     self_v.partial_cmp(other_v)
                 } else {
                     None
-                }               
-            },
+                }
+            }
             DBDatatype::VarChar(self_v) => {
                 if let DBDatatype::VarChar(other_v) = other {
                     Some(self_v.cmp(other_v))
@@ -136,7 +136,7 @@ pub enum DBResult {
 
 impl DBResult {
     pub fn expect_err(self, error_message: &str) {
-        match  self {
+        match self {
             DBResult::Error(_) => (),
             _ => panic!("{error_message}"),
         }
@@ -163,9 +163,28 @@ impl DBResult {
 
 #[derive(Debug)]
 enum DBFunction {
-    Main(fn(&mut meta::DBSettings, &mut file::FileSystem, &query::QueryResult) -> Result<Vec<HashMap<String, DBDatatype>>>),
-    MainReturnStatus(fn(&mut meta::DBSettings, &mut file::FileSystem, &query::QueryResult) -> Result<(String, Vec<i64>)>),
-    Sub(fn(&mut Vec<HashMap<String, DBDatatype>>, &query::QueryResult, &Vec<query::tokenizer::Token>, &meta::DBSettings) -> Result<()>),
+    Main(
+        fn(
+            &mut meta::DBSettings,
+            &mut file::FileSystem,
+            &query::QueryResult,
+        ) -> Result<Vec<HashMap<String, DBDatatype>>>,
+    ),
+    MainReturnStatus(
+        fn(
+            &mut meta::DBSettings,
+            &mut file::FileSystem,
+            &query::QueryResult,
+        ) -> Result<(String, Vec<i64>)>,
+    ),
+    Sub(
+        fn(
+            &mut Vec<HashMap<String, DBDatatype>>,
+            &query::QueryResult,
+            &Vec<query::tokenizer::Token>,
+            &meta::DBSettings,
+        ) -> Result<()>,
+    ),
 }
 
 pub struct DBEngine {
@@ -201,23 +220,23 @@ impl DBEngine {
 
         let mut result = match *main_function {
             DBFunction::Main(func) => {
-                match func(&mut self.db_settings, &mut  self.file_system, &query) {
+                match func(&mut self.db_settings, &mut self.file_system, &query) {
                     Ok(result) => result,
                     Err(e) => {
                         return DBResult::Error(e);
-                    },
+                    }
                 }
             }
             DBFunction::MainReturnStatus(func) => {
-                match func(&mut self.db_settings, &mut  self.file_system, &query) {
+                match func(&mut self.db_settings, &mut self.file_system, &query) {
                     Ok((status, affected_indexes)) => {
                         return DBResult::Status((status, affected_indexes));
-                    },
+                    }
                     Err(e) => {
                         return DBResult::Error(e);
-                    },
+                    }
                 }
-            },
+            }
             _ => return DBResult::Error(Error::new(ErrorKind::Other, "not reachable")),
         };
 
@@ -227,7 +246,12 @@ impl DBEngine {
 
         for (index, sub_fn_name) in query.sub_fn_names.iter().enumerate() {
             if let Some(DBFunction::Sub(sub_fn)) = self.sub_functions.get(sub_fn_name) {
-                match sub_fn(&mut result, &query, &query.sub_fn_params[index], &self.db_settings) {
+                match sub_fn(
+                    &mut result,
+                    &query,
+                    &query.sub_fn_params[index],
+                    &self.db_settings,
+                ) {
                     Ok(_) => (),
                     Err(e) => return DBResult::Error(e),
                 }

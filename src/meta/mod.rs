@@ -1,12 +1,12 @@
-use yaml_rust2::YamlLoader;
 use std::collections::HashMap;
-use std::io::{Result, ErrorKind, Error};
+use std::io::{Error, ErrorKind, Result};
+use yaml_rust2::YamlLoader;
 
 #[derive(Clone, Debug)]
 pub enum ColValue {
     NumberI,
     NumberF,
-    VarChar
+    VarChar,
 }
 #[derive(Debug)]
 pub struct DBSettings {
@@ -34,8 +34,11 @@ impl DBSettings {
 
         let mut table_map: HashMap<String, TableSettings> = HashMap::new();
 
-        for tables in doc["tables"].as_hash().expect("Expected object 'tables'").iter() {
-
+        for tables in doc["tables"]
+            .as_hash()
+            .expect("Expected object 'tables'")
+            .iter()
+        {
             let table_name = tables.0.clone().into_string().expect("Expected table name");
             let mut columns: Vec<ColSettings> = Vec::new();
 
@@ -63,7 +66,9 @@ impl DBSettings {
 
         DBSettings {
             tables: table_map,
-            compartment_rows: doc["settings"]["compartment"]["rows"].as_i64().expect("Expected compartmet rows value") as i16,
+            compartment_rows: doc["settings"]["compartment"]["rows"]
+                .as_i64()
+                .expect("Expected compartmet rows value") as i16,
         }
     }
     pub fn table_exists(&self, table_name: &String) -> bool {
@@ -102,7 +107,9 @@ impl TableSettings {
 
 /// Loads DBSettings struct from file path to valid yaml file
 pub fn load_meta(meta_file_path: &str) -> DBSettings {
-    println!("---------------- loading schema -------------------\nloading schema yaml file from: {meta_file_path}\n");
+    println!(
+        "---------------- loading schema -------------------\nloading schema yaml file from: {meta_file_path}\n"
+    );
 
     let mut file_system = crate::file::FileSystem::new();
 
@@ -115,7 +122,7 @@ pub fn load_meta(meta_file_path: &str) -> DBSettings {
         Ok(contents) => {
             println!("Schema file Read: Success");
             contents.join("\n")
-        },
+        }
         Err(e) => panic!("Schema file read failed: {e:?}"),
     };
 
@@ -137,9 +144,17 @@ pub fn load_meta(meta_file_path: &str) -> DBSettings {
             Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => {
                 let last_file_name = {
                     let mut highest_file: u32 = 0;
-                    for dir_entry in file_system.read_folder(format!("./tables/{table_name}").as_str()).unwrap() {
+                    for dir_entry in file_system
+                        .read_folder(format!("./tables/{table_name}").as_str())
+                        .unwrap()
+                    {
                         let dir_entry = dir_entry.unwrap();
-                        let fname = dir_entry.file_name().into_string().unwrap().parse::<u32>().unwrap();
+                        let fname = dir_entry
+                            .file_name()
+                            .into_string()
+                            .unwrap()
+                            .parse::<u32>()
+                            .unwrap();
                         if highest_file < fname {
                             highest_file = fname;
                         }
@@ -148,13 +163,20 @@ pub fn load_meta(meta_file_path: &str) -> DBSettings {
                     format!("{highest_file}")
                 };
 
-                file_system.open(format!("./tables/{table_name}/{last_file_name}").as_str()).unwrap();
-                let file_contents = file_system.read_from_cache(format!("./tables/{table_name}/{last_file_name}").as_str()).unwrap();
+                file_system
+                    .open(format!("./tables/{table_name}/{last_file_name}").as_str())
+                    .unwrap();
+                let file_contents = file_system
+                    .read_from_cache(format!("./tables/{table_name}/{last_file_name}").as_str())
+                    .unwrap();
 
                 let latest_index = {
                     let last_file_index: u64 = last_file_name.parse().unwrap();
-                    if file_contents.len() > 0 { // avoid underflow
-                        (db_settings.compartment_rows as u64 * last_file_index) + file_contents.len() as u64 - 1
+                    if file_contents.len() > 0 {
+                        // avoid underflow
+                        (db_settings.compartment_rows as u64 * last_file_index)
+                            + file_contents.len() as u64
+                            - 1
                     } else {
                         0
                     }
@@ -162,7 +184,7 @@ pub fn load_meta(meta_file_path: &str) -> DBSettings {
 
                 table.1.biggest_id = latest_index;
                 println!("biggest id for table '{table_name}' is '{latest_index}'\n");
-            },
+            }
             Err(e) => {
                 panic!("folder creation for table '{table_name}' failed due to error '{e}'");
             }
@@ -182,9 +204,7 @@ pub fn get_password(meta_file_path: &str) -> String {
     }
 
     let test_config_yaml = match file_system.read_from_cache(meta_file_path) {
-        Ok(contents) => {
-            contents.join("\n")
-        },
+        Ok(contents) => contents.join("\n"),
         Err(e) => panic!("Schema file read failed: {e:?}"),
     };
 

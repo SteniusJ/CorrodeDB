@@ -13,13 +13,13 @@ impl fmt::Display for JSONValue {
         match self {
             JSONValue::String(v) => {
                 write!(f, "\"{}\"", v)
-            },
+            }
             JSONValue::NumI(v) => {
                 write!(f, "{}", v)
-            },
+            }
             JSONValue::NumF(v) => {
                 write!(f, "{}", v)
-            },
+            }
             JSONValue::Array(v) => {
                 let mut ret = String::from("[");
                 for val in v {
@@ -30,7 +30,7 @@ impl fmt::Display for JSONValue {
                 }
                 ret.push(']');
                 write!(f, "{}", ret)
-            },
+            }
             JSONValue::Object(v) => {
                 let mut ret = String::from("{");
                 for val in v {

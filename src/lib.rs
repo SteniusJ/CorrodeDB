@@ -1,14 +1,15 @@
-mod file;
-mod meta;
-mod http;
-mod query;
-mod json;
-mod util;
 mod db_engine;
+mod file;
+mod http;
+mod json;
+mod meta;
+mod query;
+mod util;
 
-use std::env;
 use std::collections::HashMap;
-use std::io::{stdin};
+use std::env;
+use std::io::stdin;
+use std::process::{ExitCode, exit};
 
 const DEFAULT_SCHEMA_FILE_PATH: &str = "./schema.yaml";
 const DEFAULT_PORT: &str = "4067";
@@ -34,29 +35,42 @@ pub fn load_program_arguments() -> ProgramArgs {
 
     for (flag, value) in args {
         match flag.as_str() {
-            "-s" => {
-                program_args.schema_path = value;
-            },
-            "-p" => {
-                program_args.port = value;
-            },
-            "-di" => {
-                if value == "true" {
-                    program_args.data_integrity_check = true;
-                } else {
-                    println!("data integrity has to be called with the value 'true' to have any effect");
+            "help" | "h" => {
+                println!("Corrodedb database
+
+Usage: corrodedb [OPTIONS]
+
+Options:
+    -h, --help            Print this screen
+    -s, --schema <path>   Provide custom schema path (default schema.yaml)
+    -p, --port <port>     Provide custom host port (default 4067)
+    -d, --dataintegrity   Run database data integrity check on provided schema
+    -c, --consolequery    Enter console query mode which allows for database queries to be made in command line");
+                exit(0);
+            }
+            "schema" | "s" => {
+                if !value.is_empty() {
+                    program_args.schema_path = value;
+                    continue;
                 }
-            },
-            "-cq" => {
-                if value == "true" {
-                    program_args.console_queries = true;
-                } else {
-                    println!("console queries has to be called with the value 'true' to have any effect");
+                println!("schema option has to be given a path");
+            }
+            "port" | "p" => {
+                if !value.is_empty() {
+                    program_args.port = value;
+                    continue;
                 }
-            },
-            f=> {
+                println!("port option has to be given a port");
+            }
+            "dataintegrity" | "d" => {
+                program_args.data_integrity_check = true;
+            }
+            "consolequery" | "c" => {
+                program_args.console_queries = true;
+            }
+            f => {
                 println!("flag {f} is not a valid flag");
-            },
+            }
         }
     }
 
@@ -81,16 +95,21 @@ pub fn data_integrity_check(schema_path: &str) {
             let file = file.unwrap();
             let file_name = file.file_name().into_string().unwrap();
 
-            if let Ok(file_content) = util::file_read(&format!("./tables/{table}/{file_name}"), &mut file_system) {
+            if let Ok(file_content) =
+                util::file_read(&format!("./tables/{table}/{file_name}"), &mut file_system)
+            {
                 for (index, line) in file_content.iter().enumerate() {
                     if line.is_empty() {
                         continue;
-                    } 
+                    }
 
                     let columns_data = util::escape_split(&line, ',');
 
                     if columns_data.len() != table_settings.columns.len() {
-                        println!("! {table}: {file_name} - error on line {} - number of columns does not match!", index + 1);
+                        println!(
+                            "! {table}: {file_name} - error on line {} - number of columns does not match!",
+                            index + 1
+                        );
                     }
 
                     for (column_index, column_data) in columns_data.iter().enumerate() {
@@ -101,21 +120,27 @@ pub fn data_integrity_check(schema_path: &str) {
                         match table_settings.columns[column_index].value {
                             meta::ColValue::NumberI => {
                                 if column_data.parse::<i64>().is_err() {
-                                    println!("! {table}: {file_name} - error on line {} - datatype does not match, expected NumberI for column {column_index}!", index + 1);
+                                    println!(
+                                        "! {table}: {file_name} - error on line {} - datatype does not match, expected NumberI for column {column_index}!",
+                                        index + 1
+                                    );
                                 }
-                            },
+                            }
                             meta::ColValue::NumberF => {
                                 if column_data.parse::<f64>().is_err() {
-                                    println!("! {table}: {file_name} - error on line {} - datatype does not match, expected NumberF for column {column_index}!", index + 1);
+                                    println!(
+                                        "! {table}: {file_name} - error on line {} - datatype does not match, expected NumberF for column {column_index}!",
+                                        index + 1
+                                    );
                                 }
-                            },
+                            }
                             meta::ColValue::VarChar => (),
                         }
                     }
                 }
             } else {
                 panic!("failed to read file {file_name}");
-            } 
+            }
         }
 
         println!("Finished checking data for table: {table}\n");
@@ -144,13 +169,30 @@ pub fn start_database(schema_path: &str, port: &str) {
 
     http_server.add_endpoint("/", http::HTTPRequestMethods::POST, |body, _url_params| {
         match db_engine.query(&body) {
-            db_engine::DBResult::Data(result) => return http::create_http_response(200, "application/json",  &encode_db_return(result)),
-            db_engine::DBResult::Status((status, affected_rows)) => return http::create_http_response(
-                200,
-                "application/json",
-                &json::encode(vec![("status", json::JSONValue::String(format!("{status}"))), ("affected_rows", affected_rows.into())])
-            ),
-            db_engine::DBResult::Error(e) => return http::create_http_response(400, "application/json",  &json::encode(vec![("error", json::JSONValue::String(format!("{e}")))])),
+            db_engine::DBResult::Data(result) => {
+                return http::create_http_response(
+                    200,
+                    "application/json",
+                    &encode_db_return(result),
+                );
+            }
+            db_engine::DBResult::Status((status, affected_rows)) => {
+                return http::create_http_response(
+                    200,
+                    "application/json",
+                    &json::encode(vec![
+                        ("status", json::JSONValue::String(format!("{status}"))),
+                        ("affected_rows", affected_rows.into()),
+                    ]),
+                );
+            }
+            db_engine::DBResult::Error(e) => {
+                return http::create_http_response(
+                    400,
+                    "application/json",
+                    &json::encode(vec![("error", json::JSONValue::String(format!("{e}")))]),
+                );
+            }
         }
     });
 
@@ -169,7 +211,9 @@ pub fn start_databese_console_queries_mode(schema_path: &str) {
 
         match db_engine.query(&query) {
             db_engine::DBResult::Data(result) => println!("{}", util::db_result_prettify(result)),
-            db_engine::DBResult::Status((status, affected_rows)) => println!("{status} affected rows: {affected_rows:?}"),
+            db_engine::DBResult::Status((status, affected_rows)) => {
+                println!("{status} affected rows: {affected_rows:?}")
+            }
             db_engine::DBResult::Error(e) => println!("{e}"),
         }
     }
@@ -188,7 +232,10 @@ fn encode_db_return(vec: Vec<HashMap<String, db_engine::DBDatatype>>) -> String 
     let mut json_array: Vec<json::JSONValue> = Vec::new();
 
     if vec.is_empty() {
-        return json::encode(vec![("error", json::JSONValue::String(String::from("return is empty")))]);
+        return json::encode(vec![(
+            "error",
+            json::JSONValue::String(String::from("return is empty")),
+        )]);
     }
 
     for data_row in vec {
@@ -196,9 +243,16 @@ fn encode_db_return(vec: Vec<HashMap<String, db_engine::DBDatatype>>) -> String 
 
         for (col_name, content) in data_row {
             match content {
-                db_engine::DBDatatype::NumberI(v) => json_object.push((col_name, json::JSONValue::NumI(v))),
-                db_engine::DBDatatype::NumberF(v) => json_object.push((col_name, json::JSONValue::NumF(v))),
-                db_engine::DBDatatype::VarChar(v) => json_object.push((col_name, json::JSONValue::String(util::rehydrate_db_entry(v)))),
+                db_engine::DBDatatype::NumberI(v) => {
+                    json_object.push((col_name, json::JSONValue::NumI(v)))
+                }
+                db_engine::DBDatatype::NumberF(v) => {
+                    json_object.push((col_name, json::JSONValue::NumF(v)))
+                }
+                db_engine::DBDatatype::VarChar(v) => json_object.push((
+                    col_name,
+                    json::JSONValue::String(util::rehydrate_db_entry(v)),
+                )),
             }
         }
 
